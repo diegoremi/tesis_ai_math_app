@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id         Int      @id @default(autoincrement())
+  first_name      String   @db.VarChar(100)
+  last_name       String   @db.VarChar(100)
+  email           String   @unique @db.VarChar(120)
+  password_hash   String   @db.VarChar(255)
+  age             Int
+  education_level EducationLevel?
+  goal            String?  @db.VarChar(150)
+  role            Role     @default(student)
+  created_at      DateTime @default(now())
+
+  sessions      Session[]
+  activities    Activity[]
+  assessments   Assessment[]
+  surveys       Survey[]
+  ai_feedback   AIFeedback[]
+  infrastructure Infrastructure[]
+}
+
+model Session {
+  session_id         Int       @id @default(autoincrement())
+  user_id            Int
+  start_time         DateTime
+  end_time           DateTime?
+  total_time_seconds Int?
+  device             Device?
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model Activity {
+  activity_id      Int            @id @default(autoincrement())
+  user_id          Int
+  activity_type    ActivityType
+  difficulty_level DifficultyLevel
+  attempts         Int            @default(0)
+  correct_answers  Int            @default(0)
+  status           Status         @default(pending)
+  created_at       DateTime       @default(now())
+
+  user        User         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  ai_feedback AIFeedback[]
+
+  @@index([user_id])
+}
+
+model Assessment {
+  assessment_id   Int            @id @default(autoincrement())
+  user_id         Int
+  assessment_type AssessmentType
+  total_score     Decimal        @db.Decimal(5, 2)
+  created_at      DateTime       @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model Survey {
+  survey_id         Int     @id @default(autoincrement())
+  user_id           Int
+  perceived_utility Int?    @db.SmallInt
+  ease_of_use       Int?    @db.SmallInt
+  motivation        Int?    @db.SmallInt
+  autonomy          Int?    @db.SmallInt
+  comments          String? @db.Text
+  created_at        DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model AIFeedback {
+  log_id       Int          @id @default(autoincrement())
+  user_id      Int
+  activity_id  Int?
+  ai_message   String       @db.Text
+  message_type MessageType
+  created_at   DateTime     @default(now())
+
+  user     User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activity_id], references: [activity_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([activity_id])
+}
+
+model Infrastructure {
+  access_id           Int                 @id @default(autoincrement())
+  user_id             Int
+  device              Device
+  internet_connection InternetConnection
+  observations        String?             @db.Text
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+enum EducationLevel {
+  high_school
+  university
+  other
+}
+
+enum Role {
+  student
+  facilitator
+  admin
+}
+
+enum Device {
+  PC
+  mobile
+  tablet
+}
+
+enum ActivityType {
+  arithmetic
+  algebra
+  problems
+  statistics
+}
+
+enum DifficultyLevel {
+  basic
+  intermediate
+  advanced
+}
+
+enum Status {
+  completed
+  pending
+}
+
+enum AssessmentType {
+  pretest
+  posttest
+}
+
+enum MessageType {
+  suggestion
+  explanation
+  positive
+}
+
+enum InternetConnection {
+  high
+  medium
+  low
+}
