@@ -1,7 +1,10 @@
-
-import express, { Express, Request, Response } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import userRoutes from './routes/user.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import activityRoutes from './routes/activity.routes.js';
+import evaluationRoutes from './routes/evaluation.routes.js';
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -10,8 +13,13 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/evaluations', evaluationRoutes);
+
 app.get('/', (req: Request, res: Response) => {
-  res.send('Hello, world!');
+  res.send('Backend is running!');
 });
 
 app.listen(port, () => {
