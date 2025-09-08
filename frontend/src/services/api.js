@@ -81,3 +81,7 @@ export const updatePassword = (passwordData) => {
 export const registerUser = (userData) => {
   return apiClient.post('/users', userData);
 };
+
+export const getHint = (exerciseId) => {
+  return apiClient.post('/ai/hint', { exerciseId });
+};
