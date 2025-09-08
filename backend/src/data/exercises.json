@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "type": "arithmetic",
+    "difficulty": "basic",
+    "question": "What is 2 + 2?",
+    "answer": "4"
+  },
+  {
+    "id": 2,
+    "type": "arithmetic",
+    "difficulty": "intermediate",
+    "question": "What is 15 * 5?",
+    "answer": "75"
+  },
+  {
+    "id": 3,
+    "type": "algebra",
+    "difficulty": "basic",
+    "question": "Solve for x: x + 5 = 10",
+    "answer": "5"
+  },
+  {
+    "id": 4,
+    "type": "algebra",
+    "difficulty": "intermediate",
+    "question": "Solve for x: 2x - 3 = 7",
+    "answer": "5"
+  }
+]

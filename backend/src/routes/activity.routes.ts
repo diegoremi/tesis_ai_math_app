@@ -7,6 +7,8 @@ import {
   getActivityByIdController,
   updateActivityController,
   deleteActivityController,
+  getExerciseController,
+  submitAnswerController,
 } from '../controllers/activity.controller.js';
 
 const router = Router();
@@ -14,6 +16,8 @@ const router = Router();
 // All activity routes require authentication
 router.use(authenticateToken);
 
+router.get('/exercise', getExerciseController);
+router.post('/exercise/submit', submitAnswerController);
 router.post('/', createActivityController);
 router.get('/', getActivitiesController);
 router.get('/:id', getActivityByIdController);

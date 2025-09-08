@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  pool_timeout = 30
 }
 
 model User {
@@ -18,6 +19,8 @@ model User {
   password_hash   String   @db.VarChar(255)
   age             Int
   education_level EducationLevel?
+  gender          Gender?
+  math_level      MathLevel?
   goal            String?  @db.VarChar(150)
   role            Role     @default(student)
   created_at      DateTime @default(now())
@@ -164,4 +167,16 @@ enum InternetConnection {
   high
   medium
   low
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum MathLevel {
+  beginner
+  intermediate
+  advanced
 }

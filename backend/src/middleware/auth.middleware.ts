@@ -22,3 +22,15 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     next(); // proceed to the next middleware or route handler
   });
 };
+
+export const authorizeRole = (roles: string[]) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ message: 'Unauthorized: User role not found.' });
+    }
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden: Insufficient role.' });
+    }
+    next();
+  };
+};

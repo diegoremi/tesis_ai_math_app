@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: 'http://localhost:8080/api',
 });
 
 // Request interceptor to add the JWT token to headers
@@ -40,4 +40,44 @@ export const getActivities = () => {
 
 export const getAssessments = () => {
   return apiClient.get('/evaluations');
+};
+
+export const getExercise = () => {
+  return apiClient.get('/activities/exercise');
+};
+
+export const submitAnswer = (answerData) => {
+  return apiClient.post('/activities/exercise/submit', answerData);
+};
+
+export const chat = (message) => {
+  return apiClient.post('/ai/chat', { message });
+};
+
+export const submitSurvey = (surveyData) => {
+  return apiClient.post('/survey/submit', surveyData);
+};
+
+export const getUsers = () => {
+  return apiClient.get('/admin/users');
+};
+
+export const getAdminActivities = () => {
+  return apiClient.get('/admin/activities');
+};
+
+export const getAdminAssessments = () => {
+  return apiClient.get('/admin/assessments');
+};
+
+export const exportData = (dataType) => {
+  return apiClient.get(`/admin/export?type=${dataType}`, { responseType: 'blob' });
+};
+
+export const updatePassword = (passwordData) => {
+  return apiClient.put('/users/password', passwordData);
+};
+
+export const registerUser = (userData) => {
+  return apiClient.post('/users', userData);
 };

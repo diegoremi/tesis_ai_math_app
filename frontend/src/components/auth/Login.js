@@ -56,6 +56,7 @@ const Login = () => {
         <button type="submit" disabled={loading}>
           {loading ? 'Logging in...' : 'Login'}
         </button>
+        <button type="button" onClick={() => navigate('/register')}>Create Account</button>
         {error && <p style={{ color: 'red' }}>{error}</p>}
       </form>
     </div>

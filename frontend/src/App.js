@@ -3,7 +3,11 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import Login from './components/auth/Login';
 import Dashboard from './components/Dashboard';
-import Profile from './components/Profile'; // Import Profile component
+import Profile from './components/Profile';
+import Exercises from './components/Exercises';
+import Survey from './components/Survey';
+import AdminDashboard from './components/AdminDashboard';
+import Register from './components/auth/Register';
 import './App.css';
 
 // Simple ProtectedRoute component
@@ -26,6 +30,7 @@ function App() {
       <header className="App-header">
         <Routes>
           <Route path="/" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           {/* Protected Routes */}
           <Route
             path="/dashboard"
@@ -36,10 +41,34 @@ function App() {
             }
           />
           <Route
-            path="/profile" // New route for profile
+            path="/profile"
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exercises"
+            element={
+              <ProtectedRoute>
+                <Exercises />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/survey"
+            element={
+              <ProtectedRoute>
+                <Survey />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />
