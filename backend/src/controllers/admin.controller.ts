@@ -58,6 +58,11 @@ export const exportDataController = async (req: AuthenticatedRequest, res: Respo
         fields = ['assessment_id', 'user_id', 'assessment_type', 'total_score', 'created_at'];
         filename = 'assessments.csv';
         break;
+      case 'ancova':
+        data = await buildAncovaDataset();
+        fields = ['participant_code', 'grupo', 'pretest', 'postest', 'tam_utilidad', 'tam_facilidad', 'edad', 'education_level'];
+        filename = 'ancova_dataset.csv';
+        break;
       default:
         return res.status(400).json({ message: 'Invalid data type for export' });
     }
@@ -73,4 +78,63 @@ export const exportDataController = async (req: AuthenticatedRequest, res: Respo
     console.error(error);
     res.status(500).json({ message: 'Error exporting data' });
   }
+};
+
+const buildAncovaDataset = async () => {
+  const participants = await prisma.user.findMany({
+    include: {
+      assignments: {
+        orderBy: { assigned_at: 'desc' },
+        take: 1,
+      },
+      assessments: true,
+      surveySubmissions: {
+        where: { instrument: 'tam' },
+        orderBy: { submitted_at: 'desc' },
+        take: 1,
+        include: {
+          responses: {
+            include: {
+              item: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return participants.map(participant => {
+    const assignment = participant.assignments[0];
+    const pretest = participant.assessments.find(assessment => assessment.assessment_type === 'pretest');
+    const postest = participant.assessments.find(assessment => assessment.assessment_type === 'posttest');
+    const tamSubmission = participant.surveySubmissions[0];
+
+    const tamScores = { utilidad: null as number | null, facilidad: null as number | null };
+
+    if (tamSubmission) {
+      const utilidadResponses = tamSubmission.responses.filter(response => response.item?.subscale === 'utilidad');
+      const facilidadResponses = tamSubmission.responses.filter(response => response.item?.subscale === 'facilidad');
+
+      const utilidadAverage = utilidadResponses.length
+        ? utilidadResponses.reduce((sum, response) => sum + (response.value ?? 0), 0) / utilidadResponses.length
+        : null;
+      const facilidadAverage = facilidadResponses.length
+        ? facilidadResponses.reduce((sum, response) => sum + (response.value ?? 0), 0) / facilidadResponses.length
+        : null;
+
+      tamScores.utilidad = utilidadAverage;
+      tamScores.facilidad = facilidadAverage;
+    }
+
+    return {
+      participant_code: participant.participant_code,
+      grupo: assignment?.group ?? null,
+      pretest: pretest?.total_score ?? null,
+      postest: postest?.total_score ?? null,
+      tam_utilidad: tamScores.utilidad,
+      tam_facilidad: tamScores.facilidad,
+      edad: participant.age,
+      education_level: participant.education_level,
+    };
+  });
 };

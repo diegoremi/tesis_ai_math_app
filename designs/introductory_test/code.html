@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<title>Stitch Design</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+      :root {
+        --primary-50: #f0fdf4;
+        --primary-100: #dcfce7;
+        --primary-200: #bbf7d0;
+        --primary-300: #86efac;
+        --primary-400: #4ade80;
+        --primary-500: #22c55e;
+        --primary-600: #16a34a;
+        --primary-700: #15803d;
+        --primary-800: #166534;
+        --primary-900: #14532d;
+        --primary-950: #052e16;
+      }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-50" style='font-family: "Spline Sans", "Noto Sans", sans-serif;'>
+<div class="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-800 px-10 py-4">
+<div class="flex items-center gap-3 text-white">
+<svg class="text-[var(--primary-400)]" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 3v18h18"></path>
+<path d="M11.25 10.25 15.5 6l4.5 12"></path>
+<path d="m8.5 8.5 3 3"></path>
+<path d="M12 21a9 9 0 0 0 9-9"></path>
+</svg>
+<h2 class="text-white text-xl font-bold leading-tight tracking-tight">
+              MathMaster
+            </h2>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#">Home</a>
+<a class="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#">Practice</a>
+<a class="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#">Learn</a>
+<a class="text-white text-sm font-semibold leading-normal" href="#">Assessments</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center rounded-full h-10 w-10 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">
+                notifications
+              </span>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-gray-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCQ3lT2STedcQhDv9Af3zw_D1aXQovh4ND5B36nfpv6vW2g6e2H5gfCS_7uItFqCXvN3ul6ogo4tOpSNIahDGxy8SNFG1Xrdf9hoxQUUb2k5SDVA7p9zA_IKUD8qIkIutbThm2JcqU1z8O_mFjsbv0awWXDcmSjBRh7Yingr1lCjKNkqJUHGi_jDy2fooxlhE4Yez5Iyq2xYo1TYSpyI3qs8whD9DO6UaYc0ThDNxbw2GTHOcvCQ0sfDNjz8r9EGaMKNFLNNXgoHLU");'></div>
+</div>
+</header>
+<main class="flex-1 flex justify-center py-12 px-4 sm:px-6 lg:px-8">
+<div class="w-full max-w-2xl mx-auto bg-gray-900 rounded-2xl shadow-2xl p-8 space-y-8">
+<div class="text-center">
+<h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Math Assessment
+              </h1>
+<p class="mt-3 text-base text-gray-400">
+                Answer all questions to the best of your ability. You have
+                <span class="font-semibold text-white">60 minutes</span> to complete this assessment.
+              </p>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-center">
+<p class="text-sm font-medium text-gray-300">Progress</p>
+<p class="text-sm font-bold text-[var(--primary-400)]">25%</p>
+</div>
+<div class="w-full bg-gray-700 rounded-full h-2.5">
+<div class="bg-[var(--primary-500)] h-2.5 rounded-full" style="width: 25%"></div>
+</div>
+</div>
+<div class="border-t border-gray-800 pt-8">
+<p class="text-lg font-semibold text-white">
+                Question 5 of 20
+              </p>
+<p class="mt-2 text-xl text-gray-300">
+                Solve for x: <span class="font-mono text-2xl font-bold text-[var(--primary-400)] ml-2">3x + 7 = 22</span>
+</p>
+<div class="mt-6">
+<label class="sr-only" for="answer">Enter your answer</label>
+<input class="form-input block w-full rounded-xl border-2 border-gray-700 bg-gray-800 px-4 py-3.5 text-base text-white placeholder-gray-500 transition focus:border-[var(--primary-500)] focus:outline-none focus:ring-[var(--primary-500)]" id="answer" name="answer" placeholder="Your answer" type="text"/>
+</div>
+</div>
+<div class="flex justify-between items-center pt-6 border-t border-gray-800">
+<button class="flex items-center gap-2 rounded-full py-2.5 px-6 bg-gray-800 text-white text-sm font-bold hover:bg-gray-700 transition-colors">
+<span class="material-symbols-outlined">
+                    arrow_back
+                  </span>
+<span>Previous</span>
+</button>
+<button class="flex items-center gap-2 rounded-full py-2.5 px-6 bg-[var(--primary-500)] text-gray-950 text-sm font-bold hover:bg-[var(--primary-600)] transition-colors">
+<span>Next</span>
+<span class="material-symbols-outlined">
+                    arrow_forward
+                  </span>
+</button>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>

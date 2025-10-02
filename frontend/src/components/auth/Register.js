@@ -73,10 +73,10 @@ const Register = () => {
         </div>
         <div className="flex flex-1 justify-end gap-2">
           <div className="flex items-center gap-2">
-            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="#">Home</a>
-            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="#">Features</a>
-            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="#">Pricing</a>
-            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="#">Support</a>
+            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="/">Home</a>
+            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="/#features">Features</a>
+            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="/#pricing">Pricing</a>
+            <a className="text-white/80 hover:text-white hover:bg-white/10 rounded-full px-4 py-2 text-sm font-medium leading-normal transition-colors" href="/#support">Support</a>
           </div>
           <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-6 bg-white/10 text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-white/20 transition-colors">
             <span className="truncate">Log In</span>

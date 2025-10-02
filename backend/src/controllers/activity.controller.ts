@@ -2,14 +2,8 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { createActivity, getActivitiesByUserId, getActivityById, updateActivity, deleteActivity } from '../services/activity.service.js';
-import { getUserById } from '../services/user.service.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import axios from 'axios';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { recommendPracticeItem, gradePracticeAnswer } from '../services/planner.service.js';
+import { logEvent } from '../services/event.service.js';
 
 export const getExerciseController = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -18,29 +12,24 @@ export const getExerciseController = async (req: AuthenticatedRequest, res: Resp
       return res.status(400).json({ message: 'User ID not found in token' });
     }
 
-    const user = await getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const recommendation = await recommendPracticeItem(userId);
+    await logEvent(userId, {
+      event_type: 'session_start',
+      metadata: {
+        source: 'practice',
+        item_id: recommendation.itemId,
+        domain: recommendation.domain,
+        competency: recommendation.competency,
+      },
+    });
 
-    const activities = await getActivitiesByUserId(userId);
-    const totalAttempts = activities.reduce((sum, act) => sum + act.attempts, 0);
-    const totalCorrect = activities.reduce((sum, act) => sum + act.correct_answers, 0);
-    const performance = totalAttempts > 0 ? totalCorrect / totalAttempts : 0;
-
-    let difficulty = 'basic';
-    if (performance >= 0.7) {
-      difficulty = 'advanced';
-    } else if (performance >= 0.4) {
-      difficulty = 'intermediate';
-    }
-
-    const prompt = `Generate a ${difficulty} ${user.education_level} level math problem for a ${user.age}-year-old ${user.gender} user with a ${user.math_level} math level. The problem should be concise and have a clear numerical answer.`;
-
-    const aiResponse = await axios.post('http://localhost:8001/generate_exercise', { prompt });
-    const exercise = aiResponse.data;
-
-    res.status(200).json(exercise);
+    res.status(200).json({
+      id: recommendation.itemId,
+      stem: recommendation.stem,
+      options: recommendation.options,
+      domain: recommendation.domain,
+      competency: recommendation.competency,
+    });
   } catch (error) {
     console.error('Unexpected error in getExerciseController:', error);
     res.status(500).json({ message: 'Error fetching exercise' });
@@ -56,36 +45,21 @@ export const submitAnswerController = async (req: AuthenticatedRequest, res: Res
 
     const { exerciseId, userAnswer } = req.body;
 
-    const exercisesPath = path.join(__dirname, '../data/exercises.json');
-    const data = await fs.readFile(exercisesPath, 'utf-8');
-    const exercises = JSON.parse(data);
-
-    const exercise = exercises.find(ex => ex.id === exerciseId);
-    if (!exercise) {
-      return res.status(404).json({ message: 'Exercise not found' });
+    if (typeof exerciseId !== 'number' || typeof userAnswer !== 'string') {
+      return res.status(400).json({ message: 'Invalid payload. Provide exerciseId and userAnswer.' });
     }
 
-    const isCorrect = exercise.answer.toLowerCase() === userAnswer.toLowerCase();
+    const result = await gradePracticeAnswer(userId, exerciseId, userAnswer);
 
-    const activities = await getActivitiesByUserId(userId);
-    let activity = activities.find(act => act.activity_type === exercise.type);
+    await logEvent(userId, {
+      event_type: result.correct ? 'correct' : 'incorrect',
+      metadata: {
+        source: 'practice',
+        item_id: exerciseId,
+      },
+    });
 
-    if (activity) {
-      const updatedActivity = await updateActivity(activity.activity_id, {
-        attempts: activity.attempts + 1,
-        correct_answers: activity.correct_answers + (isCorrect ? 1 : 0),
-      });
-      res.status(200).json({ correct: isCorrect, activity: updatedActivity });
-    } else {
-      const newActivity = await createActivity(userId, {
-        activity_type: exercise.type,
-        difficulty_level: exercise.difficulty,
-        attempts: 1,
-        correct_answers: isCorrect ? 1 : 0,
-        status: 'pending',
-      });
-      res.status(201).json({ correct: isCorrect, activity: newActivity });
-    }
+    res.status(200).json({ correct: result.correct, summary: { attempts: result.attempts, accuracy: result.accuracy } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error submitting answer' });
@@ -122,7 +96,7 @@ export const getActivitiesController = async (req: AuthenticatedRequest, res: Re
 
 export const getActivityByIdController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const activityId = parseInt(req.params.id);
+    const activityId = Number.parseInt(req.params.id ?? '', 10);
     const activity = await getActivityById(activityId);
     if (!activity) {
       return res.status(404).json({ message: 'Activity not found' });
@@ -140,7 +114,7 @@ export const getActivityByIdController = async (req: AuthenticatedRequest, res: 
 
 export const updateActivityController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const activityId = parseInt(req.params.id);
+    const activityId = Number.parseInt(req.params.id ?? '', 10);
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in token' });
@@ -165,7 +139,7 @@ export const updateActivityController = async (req: AuthenticatedRequest, res: R
 
 export const deleteActivityController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const activityId = parseInt(req.params.id);
+    const activityId = Number.parseInt(req.params.id ?? '', 10);
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in token' });

@@ -17,8 +17,8 @@ export const createUserService = async (userData: any) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const parsedAge = parseInt(age, 10);
-  if (isNaN(parsedAge)) {
+  const parsedAge = age !== undefined && age !== null ? Number.parseInt(age, 10) : null;
+  if (age !== undefined && age !== null && Number.isNaN(parsedAge)) {
     throw new Error('Invalid age provided');
   }
 
@@ -55,6 +55,8 @@ export const getUserById = async (userId: number) => {
       goal: true,
       role: true,
       created_at: true,
+      gender: true,
+      math_level: true,
     },
   });
 

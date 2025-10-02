@@ -2,34 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import { getActivities, getAssessments } from '../services/api';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
 import Chatbot from './Chatbot'; // Import Chatbot component
-
-
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout, user, featureFlags } = useAuth();
   const [activities, setActivities] = useState([]);
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,48 +49,21 @@ const Dashboard = () => {
     return <div>Error: {error}</div>;
   }
 
-  const activityData = {
-    labels: activities.map(act => new Date(act.created_at).toLocaleDateString()),
-    datasets: [
-      {
-        label: 'Correct Answers',
-        data: activities.map(act => act.correct_answers),
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1,
-      },
-      {
-        label: 'Attempts',
-        data: activities.map(act => act.attempts),
-        borderColor: 'rgb(255, 99, 132)',
-        tension: 0.1,
-      },
-    ],
+  const chatbotEnabled = Boolean(featureFlags?.chatbot);
+  const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
+  const getLatestByType = (type) => {
+    const filtered = assessments.filter((assessment) => assessment.assessment_type === type);
+    if (filtered.length === 0) return null;
+    return filtered.reduce((latest, current) => {
+      return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
+    }, filtered[0]);
   };
 
-  const assessmentData = {
-    labels: assessments.map(ass => `${ass.assessment_type} (${new Date(ass.created_at).toLocaleDateString()})`),
-    datasets: [
-      {
-        label: 'Total Score',
-        data: assessments.map(ass => ass.total_score),
-        borderColor: 'rgb(53, 162, 235)',
-        tension: 0.1,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'User Progress',
-      },
-    },
-  };
+  const latestPre = getLatestByType('pretest');
+  const latestPost = getLatestByType('posttest');
+  const deltaScore = latestPre && latestPost && latestPre.total_score !== null && latestPost.total_score !== null
+    ? latestPost.total_score - latestPre.total_score
+    : null;
 
   return (
     <>
@@ -144,12 +94,16 @@ const Dashboard = () => {
         </div>
       </header>
       
-      <main className="flex-1 px-10 py-12">
+      <main className="flex-1 px-10 py-12 relative">
         <div className="mx-auto max-w-4xl">
           <div className="mb-12">
-            <p className="text-sm font-medium text-[#9eb7a8]">Day X of Y</p>
+            <p className="text-sm font-medium text-[#9eb7a8]">{featureFlags?.assigned_group ? `Group ${featureFlags.assigned_group}` : 'Pending assignment'}</p>
             <h1 className="text-4xl font-bold text-white mt-1">Daily Learning</h1>
-            <p className="text-lg text-gray-400 mt-2">Your journey to mastering calculus continues. Let's dive in!</p>
+            <p className="text-lg text-gray-400 mt-2">
+              {adaptativeEnabled
+                ? 'Your practice set is tailored from the latest telemetry.'
+                : 'Complete your daily goals to unlock adaptive recommendations.'}
+            </p>
           </div>
           <div className="mb-12">
             <div className="flex items-center justify-between mb-2">
@@ -160,6 +114,25 @@ const Dashboard = () => {
               <div className="bg-[var(--primary-color)] h-2.5 rounded-full" style={{ width: activities.length > 0 ? `${Math.round((activities.filter(act => act.correct_answers > 0).length / activities.length) * 100)}%` : '0%' }}></div>
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+            <div className="rounded-2xl border border-[#29382f] bg-[#1a221d] p-5">
+              <p className="text-sm text-[#9eb7a8]">Pretest score</p>
+              <p className="text-3xl font-bold text-white mt-2">{latestPre?.total_score ?? '—'}</p>
+              <p className="text-xs text-[#9eb7a8] mt-3">Taken {latestPre ? new Date(latestPre.created_at).toLocaleDateString() : 'pending'}</p>
+            </div>
+            <div className="rounded-2xl border border-[#29382f] bg-[#1a221d] p-5">
+              <p className="text-sm text-[#9eb7a8]">Post test score</p>
+              <p className="text-3xl font-bold text-white mt-2">{latestPost?.total_score ?? '—'}</p>
+              <p className="text-xs text-[#9eb7a8] mt-3">{latestPost ? new Date(latestPost.created_at).toLocaleDateString() : 'Complete exit test to unlock'}</p>
+            </div>
+            <div className="rounded-2xl border border-[#29382f] bg-[#1a221d] p-5">
+              <p className="text-sm text-[#9eb7a8]">Score delta</p>
+              <p className={`text-3xl font-bold mt-2 ${deltaScore !== null ? (deltaScore >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-white'}`}>
+                {deltaScore !== null ? `${deltaScore >= 0 ? '+' : ''}${deltaScore}` : '—'}
+              </p>
+              <p className="text-xs text-[#9eb7a8] mt-3">Difference between latest pre/post results</p>
+            </div>
+          </div>
           <div className="space-y-8">
             <h2 className="text-2xl font-bold text-white border-b border-[#29382f] pb-3">Today's Module</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
@@ -168,7 +141,11 @@ const Dashboard = () => {
                   <h3 className="text-xl font-bold text-white mb-2">Theory: Calculus Basics</h3>
                   <p className="text-[#9eb7a8] text-sm leading-relaxed">Understand the fundamental concepts of calculus, including limits, derivatives, and integrals.</p>
                 </div>
-                <button className="mt-6 w-full md:w-auto flex items-center justify-center gap-2 rounded-full h-12 px-6 bg-[var(--primary-color)] text-black text-base font-bold hover:opacity-90 transition-opacity">
+                <button
+                  className="mt-6 w-full md:w-auto flex items-center justify-center gap-2 rounded-full h-12 px-6 bg-[var(--primary-color)] text-black text-base font-bold hover:opacity-90 transition-opacity"
+                  type="button"
+                  onClick={() => navigate('/study/pretest')}
+                >
                   <span>Start Learning</span>
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </button>
@@ -182,8 +159,12 @@ const Dashboard = () => {
                   <h3 className="text-xl font-bold text-white mb-2">Practice: Calculus Problems</h3>
                   <p className="text-[#9eb7a8] text-sm leading-relaxed">Apply your knowledge by solving a variety of calculus problems. Focus on accuracy and speed.</p>
                 </div>
-                <button className="mt-6 w-full md:w-auto flex items-center justify-center gap-2 rounded-full h-12 px-6 bg-[var(--primary-color)] text-black text-base font-bold hover:opacity-90 transition-opacity">
-                  <span>Start Practice</span>
+                <button
+                  className="mt-6 w-full md:w-auto flex items-center justify-center gap-2 rounded-full h-12 px-6 bg-[var(--primary-color)] text-black text-base font-bold hover:opacity-90 transition-opacity"
+                  type="button"
+                  onClick={() => navigate('/exercises')}
+                >
+                  <span>{adaptativeEnabled ? 'Adaptive Practice' : 'Standard Practice'}</span>
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </button>
               </div>
@@ -194,10 +175,19 @@ const Dashboard = () => {
             <p className="text-sm text-gray-500 mt-2">Keep up the great work! Consistency is key.</p>
           </div>
         </div>
+        {chatbotEnabled && (
+          <button
+            type="button"
+            onClick={() => setShowChatbot(true)}
+            className="fixed bottom-10 right-12 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary-color)] text-[#111714] shadow-lg transition-transform hover:scale-105"
+          >
+            <span className="material-symbols-outlined text-3xl">chat</span>
+          </button>
+        )}
       </main>
     </div>
     </div>
-    {showChatbot && (
+    {chatbotEnabled && showChatbot && (
         <div className="modal-overlay">
           <div className="modal-content">
             <button className="close-button" onClick={() => setShowChatbot(false)}>&times;</button>

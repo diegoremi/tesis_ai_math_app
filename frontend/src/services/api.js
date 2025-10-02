@@ -42,6 +42,14 @@ export const getAssessments = () => {
   return apiClient.get('/evaluations');
 };
 
+export const createAssessment = (assessmentPayload) => {
+  return apiClient.post('/evaluations', assessmentPayload);
+};
+
+export const getAssessmentItems = (params) => {
+  return apiClient.get('/evaluations/items', { params });
+};
+
 export const getExercise = () => {
   return apiClient.get('/activities/exercise');
 };
@@ -56,6 +64,30 @@ export const chat = (message) => {
 
 export const submitSurvey = (surveyData) => {
   return apiClient.post('/survey/submit', surveyData);
+};
+
+export const getSurveyItems = (params) => {
+  return apiClient.get('/survey/items', { params });
+};
+
+export const submitConsent = (consentPayload) => {
+  return apiClient.post('/study/consent', consentPayload);
+};
+
+export const randomizeParticipants = (randomizePayload) => {
+  return apiClient.post('/study/randomize', randomizePayload);
+};
+
+export const fetchFeatureFlags = () => {
+  return apiClient.get('/study/feature-flags');
+};
+
+export const logEvent = (eventPayload) => {
+  return apiClient.post('/events', eventPayload);
+};
+
+export const fetchEvents = (params = {}) => {
+  return apiClient.get('/events', { params });
 };
 
 export const getUsers = () => {

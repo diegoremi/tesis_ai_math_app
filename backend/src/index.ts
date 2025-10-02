@@ -8,6 +8,8 @@ import evaluationRoutes from './routes/evaluation.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import surveyRoutes from './routes/survey.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import studyRoutes from './routes/study.routes.js';
+import eventRoutes from './routes/event.routes.js';
 
 const app: Express = express();
 const port = process.env.PORT || 8080;
@@ -23,6 +25,8 @@ app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/survey', surveyRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/study', studyRoutes);
+app.use('/api/events', eventRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Backend is running!');

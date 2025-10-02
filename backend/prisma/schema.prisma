@@ -8,29 +8,35 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  pool_timeout = 30
 }
 
 model User {
-  user_id         Int      @id @default(autoincrement())
-  first_name      String   @db.VarChar(100)
-  last_name       String   @db.VarChar(100)
-  email           String   @unique @db.VarChar(120)
-  password_hash   String   @db.VarChar(255)
-  age             Int
-  education_level EducationLevel?
-  gender          Gender?
-  math_level      MathLevel?
-  goal            String?  @db.VarChar(150)
-  role            Role     @default(student)
-  created_at      DateTime @default(now())
+  user_id          Int             @id @default(autoincrement())
+  participant_code String          @unique @default(uuid())
+  first_name       String?         @db.VarChar(100)
+  last_name        String?         @db.VarChar(100)
+  email            String          @unique @db.VarChar(120)
+  password_hash    String          @db.VarChar(255)
+  age              Int?
+  education_level  EducationLevel?
+  gender           Gender?
+  math_level       MathLevel?
+  goal             String?         @db.VarChar(150)
+  role             Role            @default(student)
+  created_at       DateTime        @default(now())
 
-  sessions      Session[]
-  activities    Activity[]
-  assessments   Assessment[]
-  surveys       Survey[]
-  ai_feedback   AIFeedback[]
-  infrastructure Infrastructure[]
+  sessions          Session[]
+  activities        Activity[]
+  assessments       Assessment[]
+  surveys           Survey[]
+  ai_feedback       AIFeedback[]
+  infrastructure    Infrastructure[]
+  consents          Consent[]
+  assignments       Assignment[]
+  featureFlag       FeatureFlag?
+  surveySubmissions SurveySubmission[]
+  events            Event[]
+  practiceSummaries PracticeSummary[]
 }
 
 model Session {
@@ -47,14 +53,18 @@ model Session {
 }
 
 model Activity {
-  activity_id      Int            @id @default(autoincrement())
+  activity_id      Int             @id @default(autoincrement())
   user_id          Int
   activity_type    ActivityType
   difficulty_level DifficultyLevel
-  attempts         Int            @default(0)
-  correct_answers  Int            @default(0)
-  status           Status         @default(pending)
-  created_at       DateTime       @default(now())
+  attempts         Int             @default(0)
+  correct_answers  Int             @default(0)
+  status           Status          @default(pending)
+  duration_seconds Int?
+  domain           String?         @db.VarChar(100)
+  competency       String?         @db.VarChar(100)
+  occurred_at      DateTime        @default(now())
+  created_at       DateTime        @default(now())
 
   user        User         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   ai_feedback AIFeedback[]
@@ -66,22 +76,26 @@ model Assessment {
   assessment_id   Int            @id @default(autoincrement())
   user_id         Int
   assessment_type AssessmentType
-  total_score     Decimal        @db.Decimal(5, 2)
+  test_version    String         @default("v1") @db.VarChar(50)
+  total_score     Int?
+  started_at      DateTime?
+  finished_at     DateTime?
   created_at      DateTime       @default(now())
 
-  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user      User                 @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  responses AssessmentResponse[]
 
   @@index([user_id])
 }
 
 model Survey {
-  survey_id         Int     @id @default(autoincrement())
+  survey_id         Int      @id @default(autoincrement())
   user_id           Int
-  perceived_utility Int?    @db.SmallInt
-  ease_of_use       Int?    @db.SmallInt
-  motivation        Int?    @db.SmallInt
-  autonomy          Int?    @db.SmallInt
-  comments          String? @db.Text
+  perceived_utility Int?     @db.SmallInt
+  ease_of_use       Int?     @db.SmallInt
+  motivation        Int?     @db.SmallInt
+  autonomy          Int?     @db.SmallInt
+  comments          String?  @db.Text
   created_at        DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
@@ -90,14 +104,16 @@ model Survey {
 }
 
 model AIFeedback {
-  log_id       Int          @id @default(autoincrement())
+  log_id       Int         @id @default(autoincrement())
   user_id      Int
   activity_id  Int?
-  ai_message   String       @db.Text
+  ai_message   String      @db.Text
   message_type MessageType
-  created_at   DateTime     @default(now())
+  prompt_hash  String?     @db.VarChar(128)
+  token_count  Int?
+  created_at   DateTime    @default(now())
 
-  user     User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user     User      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   activity Activity? @relation(fields: [activity_id], references: [activity_id], onDelete: Cascade)
 
   @@index([user_id])
@@ -105,11 +121,141 @@ model AIFeedback {
 }
 
 model Infrastructure {
-  access_id           Int                 @id @default(autoincrement())
+  access_id           Int                @id @default(autoincrement())
   user_id             Int
   device              Device
   internet_connection InternetConnection
-  observations        String?             @db.Text
+  observations        String?            @db.Text
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model Consent {
+  consent_id       Int      @id @default(autoincrement())
+  user_id          Int
+  accepted         Boolean
+  document_version String   @db.VarChar(50)
+  accepted_at      DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model Assignment {
+  assignment_id Int              @id @default(autoincrement())
+  user_id       Int
+  group         AssignmentGroup
+  method        AssignmentMethod
+  seed          String?          @db.VarChar(50)
+  assigned_at   DateTime         @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model FeatureFlag {
+  feature_flag_id Int      @id @default(autoincrement())
+  user_id         Int      @unique
+  chatbot         Boolean  @default(false)
+  adaptativo      Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
+model AssessmentItem {
+  item_id      Int      @id @default(autoincrement())
+  test_version String   @db.VarChar(50)
+  domain       String?  @db.VarChar(100)
+  competency   String?  @db.VarChar(100)
+  stem         String   @db.Text
+  options      Json
+  correct_key  String   @db.VarChar(10)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  responses AssessmentResponse[]
+}
+
+model AssessmentResponse {
+  response_id   Int      @id @default(autoincrement())
+  assessment_id Int
+  item_id       Int
+  answer        String?  @db.VarChar(50)
+  is_correct    Boolean?
+  created_at    DateTime @default(now())
+
+  assessment Assessment     @relation(fields: [assessment_id], references: [assessment_id], onDelete: Cascade)
+  item       AssessmentItem @relation(fields: [item_id], references: [item_id])
+
+  @@index([assessment_id])
+  @@index([item_id])
+}
+
+model SurveyItem {
+  survey_item_id Int              @id @default(autoincrement())
+  instrument     SurveyInstrument
+  subscale       String?          @db.VarChar(100)
+  version        String           @db.VarChar(50)
+  prompt         String           @db.Text
+  sort_order     Int?
+  created_at     DateTime         @default(now())
+
+  responses SurveyResponse[]
+}
+
+model SurveySubmission {
+  survey_submission_id Int              @id @default(autoincrement())
+  user_id              Int
+  instrument           SurveyInstrument
+  version              String           @db.VarChar(50)
+  submitted_at         DateTime         @default(now())
+
+  user      User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  responses SurveyResponse[]
+
+  @@index([user_id])
+}
+
+model SurveyResponse {
+  survey_response_id   Int      @id @default(autoincrement())
+  survey_submission_id Int
+  survey_item_id       Int
+  value                Int?
+  created_at           DateTime @default(now())
+
+  submission SurveySubmission @relation(fields: [survey_submission_id], references: [survey_submission_id], onDelete: Cascade)
+  item       SurveyItem       @relation(fields: [survey_item_id], references: [survey_item_id])
+
+  @@index([survey_submission_id])
+  @@index([survey_item_id])
+}
+
+model Event {
+  event_id    Int       @id @default(autoincrement())
+  user_id     Int
+  event_type  EventType
+  metadata    Json?
+  occurred_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id, occurred_at])
+}
+
+model PracticeSummary {
+  practice_id      Int          @id @default(autoincrement())
+  user_id          Int
+  practice_type    PracticeType
+  correct_count    Int          @default(0)
+  attempt_count    Int          @default(0)
+  duration_seconds Int?
+  occurred_at      DateTime     @default(now())
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -139,6 +285,9 @@ enum ActivityType {
   algebra
   problems
   statistics
+  exercise
+  quiz
+  flashcard
 }
 
 enum DifficultyLevel {
@@ -150,6 +299,7 @@ enum DifficultyLevel {
 enum Status {
   completed
   pending
+  in_progress
 }
 
 enum AssessmentType {
@@ -158,9 +308,9 @@ enum AssessmentType {
 }
 
 enum MessageType {
-  suggestion
+  hint
   explanation
-  positive
+  motivation
 }
 
 enum InternetConnection {
@@ -179,4 +329,37 @@ enum MathLevel {
   beginner
   intermediate
   advanced
+}
+
+enum AssignmentGroup {
+  GE
+  GC
+}
+
+enum AssignmentMethod {
+  azar
+  emparejamiento
+}
+
+enum SurveyInstrument {
+  motivacion
+  autonomia
+  tam
+  satisfaccion
+}
+
+enum EventType {
+  session_start
+  session_end
+  hint
+  correct
+  incorrect
+  streak
+  goal_met
+}
+
+enum PracticeType {
+  exercise
+  quiz
+  flashcard
 }

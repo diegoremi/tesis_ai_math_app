@@ -1,7 +1,8 @@
 
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { createAssessment, getAssessmentsByUserId, getAssessmentById, updateAssessment, deleteAssessment } from '../services/evaluation.service.js';
+import { createAssessment, getAssessmentsByUserId, getAssessmentById, updateAssessment, deleteAssessment, listAssessmentItems } from '../services/evaluation.service.js';
+import type { AssessmentType } from '@prisma/client';
 
 export const createAssessmentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -33,7 +34,7 @@ export const getAssessmentsController = async (req: AuthenticatedRequest, res: R
 
 export const getAssessmentByIdController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const assessmentId = parseInt(req.params.id);
+    const assessmentId = Number.parseInt(req.params.id ?? '', 10);
     const assessment = await getAssessmentById(assessmentId);
     if (!assessment) {
       return res.status(404).json({ message: 'Assessment not found' });
@@ -51,7 +52,7 @@ export const getAssessmentByIdController = async (req: AuthenticatedRequest, res
 
 export const updateAssessmentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const assessmentId = parseInt(req.params.id);
+    const assessmentId = Number.parseInt(req.params.id ?? '', 10);
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in token' });
@@ -76,7 +77,7 @@ export const updateAssessmentController = async (req: AuthenticatedRequest, res:
 
 export const deleteAssessmentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const assessmentId = parseInt(req.params.id);
+    const assessmentId = Number.parseInt(req.params.id ?? '', 10);
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in token' });
@@ -96,5 +97,17 @@ export const deleteAssessmentController = async (req: AuthenticatedRequest, res:
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error deleting assessment' });
+  }
+};
+
+export const getAssessmentItemsController = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const assessmentType = (req.query.type as string | undefined) ?? 'pretest';
+    const version = req.query.version as string | undefined;
+    const items = await listAssessmentItems(assessmentType as AssessmentType, version);
+    res.status(200).json({ items });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching assessment items' });
   }
 };

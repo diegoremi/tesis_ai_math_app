@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { getExercise, submitAnswer, getHint } from "../services/api";
+import React, { useEffect, useState } from "react";
+import { getExercise, submitAnswer, getHint, logEvent } from "../services/api";
+import { useAuth } from "context/AuthContext";
 
 const Exercises = () => {
+  const { featureFlags } = useAuth();
+  const chatbotEnabled = Boolean(featureFlags?.chatbot);
+  const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
+
   const [exercise, setExercise] = useState(null);
-  const [userAnswer, setUserAnswer] = useState("");
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [freeResponse, setFreeResponse] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,13 +19,18 @@ const Exercises = () => {
 
   useEffect(() => {
     fetchExercise();
+    return () => {
+      logEvent({ event_type: "session_end", metadata: { source: "practice" } }).catch(() => {});
+    };
   }, []);
 
   const fetchExercise = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
-    setUserAnswer("");
+    setSelectedOption(null);
+    setFreeResponse("");
+    setHint(null);
     try {
       const response = await getExercise();
       setExercise(response.data);
@@ -32,6 +43,7 @@ const Exercises = () => {
   };
 
   const handleHint = async () => {
+    if (!chatbotEnabled || !exercise) return;
     try {
       const response = await getHint(exercise.id);
       setHint(response.data.hint);
@@ -40,19 +52,31 @@ const Exercises = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!exercise) {
+      return;
+    }
+    const payload = selectedOption ?? freeResponse.trim();
+    if (!payload) {
+      setError("Select or enter an answer before submitting.");
+      return;
+    }
     try {
       const response = await submitAnswer({
         exerciseId: exercise.id,
-        userAnswer,
+        userAnswer: payload,
       });
-      if (response.data.correct) {
-        setResult("¡Correcto!");
+      const isCorrect = Boolean(response.data?.correct);
+      setResult(isCorrect ? "¡Correcto!" : "Incorrecto. ¡Inténtalo de nuevo!");
+      if (isCorrect) {
         setProblemsSolved((prev) => prev + 1);
-      } else {
-        setResult("Incorrecto. ¡Inténtalo de nuevo!");
       }
+      setSelectedOption(null);
+      setFreeResponse("");
+      setTimeout(() => {
+        fetchExercise();
+      }, 600);
     } catch (err) {
       setError("Error al enviar respuesta");
       console.error(err);
@@ -66,6 +90,12 @@ const Exercises = () => {
   if (error) {
     return <div>Error: {error}</div>;
   }
+
+  if (!exercise) {
+    return <div>No practice items available. Please contact the facilitator.</div>;
+  }
+
+  const hasOptions = Array.isArray(exercise.options) && exercise.options.length > 0;
 
   return (
     <div
@@ -112,52 +142,63 @@ const Exercises = () => {
         </header>
         <main className="flex flex-1 justify-center py-10 px-4">
           <div className="layout-content-container flex w-full max-w-2xl flex-col gap-8">
+            {!adaptativeEnabled && (
+              <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                Adaptive recommendations are disabled for your cohort. Complete the study to unlock full tutor access.
+              </div>
+            )}
             <div className="space-y-4 rounded-2xl bg-[#1c2620] p-6 shadow-lg">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-white">
-                  Solve the following problem
-                </h2>
-                <p className="text-lg text-gray-300">
-                  {exercise ? exercise.question : "Loading question..."}
-                </p>
+                <h2 className="text-2xl font-bold text-white">Solve the following problem</h2>
+                <p className="text-lg text-gray-300">{exercise.stem}</p>
               </div>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-                <div className="flex-1">
-                  <label className="sr-only" htmlFor="answer">
-                    Enter your answer
-                  </label>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {hasOptions ? (
+                  <div className="grid gap-3">
+                    {exercise.options.map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setSelectedOption(option.key)}
+                        className={`text-left rounded-xl border px-4 py-3 transition ${
+                          selectedOption === option.key
+                            ? 'border-[var(--primary-color)] bg-[var(--primary-color)]/10 text-white'
+                            : 'border-[#3d5245] bg-[#111714] text-[#d2e4da] hover:border-[var(--primary-color)]/60'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
                   <input
                     className="w-full rounded-full border border-[#3d5245] bg-[#111714] px-4 py-3 text-white placeholder:text-[#9eb7a8] focus:border-[var(--primary-color)] focus:ring-[var(--primary-color)]"
-                    id="answer"
                     placeholder="Enter your answer"
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
-                    required
+                    value={freeResponse}
+                    onChange={(event) => setFreeResponse(event.target.value)}
                   />
-                </div>
+                )}
                 <button
                   className="flex min-w-[84px] cursor-pointer items-center justify-center rounded-full bg-[var(--primary-color)] px-6 py-3 text-sm font-bold text-[#111714] transition-colors hover:bg-opacity-80"
                   type="submit"
-                  onClick={handleSubmit}
                 >
                   <span className="truncate">Submit</span>
                 </button>
-              </div>
+              </form>
               {result && (
                 <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                  <p
-                    className="text-sm font-medium text-yellow-400"
-                    role="alert"
-                  >
+                  <p className="text-sm font-medium text-yellow-400" role="alert">
                     Retroalimentación: {result}
                   </p>
-                  <button
-                    className="flex cursor-pointer items-center justify-center rounded-full bg-[#29382f] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#3d5245]"
-                    onClick={handleHint}
-                    aria-label="Obtener pista"
-                  >
-                    <span className="truncate">Obtener Pista</span>
-                  </button>
+                  {chatbotEnabled && (
+                    <button
+                      className="flex cursor-pointer items-center justify-center rounded-full bg-[#29382f] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#3d5245]"
+                      onClick={handleHint}
+                      aria-label="Obtener pista"
+                    >
+                      <span className="truncate">Obtener Pista</span>
+                    </button>
+                  )}
                 </div>
               )}
               {hint && (
@@ -170,9 +211,7 @@ const Exercises = () => {
               <h3 className="text-lg font-bold text-white">Progreso de Hoy</h3>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-base font-medium text-white">
-                    Problemas Resueltos
-                  </p>
+                  <p className="text-base font-medium text-white">Problemas Resueltos</p>
                   <p className="text-sm font-normal text-gray-300">
                     {problemsSolved}/{totalProblems}
                   </p>
@@ -180,9 +219,7 @@ const Exercises = () => {
                 <div className="h-2 w-full rounded-full bg-[#3d5245]">
                   <div
                     className="h-2 rounded-full bg-[var(--primary-color)]"
-                    style={{
-                      width: `${(problemsSolved / totalProblems) * 100}%`,
-                    }}
+                    style={{ width: `${(problemsSolved / totalProblems) * 100}%` }}
                     role="progressbar"
                     aria-valuenow={problemsSolved}
                     aria-valuemin="0"
@@ -196,14 +233,16 @@ const Exercises = () => {
             </div>
           </div>
         </main>
-        <div className="fixed bottom-8 right-8">
-          <button
-            aria-label="Open AI Chat"
-            className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-[var(--primary-color)] text-[#111714] shadow-lg transition-transform hover:scale-105"
-          >
-            <span className="material-symbols-outlined text-3xl"> chat </span>
-          </button>
-        </div>
+        {chatbotEnabled && (
+          <div className="fixed bottom-8 right-8">
+            <button
+              aria-label="Open AI Chat"
+              className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-[var(--primary-color)] text-[#111714] shadow-lg transition-transform hover:scale-105"
+            >
+              <span className="material-symbols-outlined text-3xl"> chat </span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

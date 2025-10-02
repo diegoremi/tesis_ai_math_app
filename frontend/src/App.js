@@ -8,6 +8,9 @@ import Exercises from './components/Exercises';
 import Survey from './components/Survey';
 import AdminDashboard from './components/AdminDashboard';
 import Register from './components/auth/Register';
+import Consent from './components/study/Consent';
+import IntroductoryTest from './components/study/IntroductoryTest';
+import ExitTest from './components/study/ExitTest';
 import './App.css';
 
 // Simple ProtectedRoute component
@@ -37,6 +40,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/study/consent"
+            element={
+              <ProtectedRoute>
+                <Consent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/study/pretest"
+            element={
+              <ProtectedRoute>
+                <IntroductoryTest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/study/exit-test"
+            element={
+              <ProtectedRoute>
+                <ExitTest />
               </ProtectedRoute>
             }
           />

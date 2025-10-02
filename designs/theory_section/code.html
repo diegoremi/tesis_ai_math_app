@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<title>Stitch Design</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+      :root {
+        --primary-color: #38e07b;
+      }
+      .material-symbols-outlined {
+        font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24
+      }
+    </style>
+</head>
+<body class="bg-gray-900">
+<div class="relative flex size-full min-h-screen flex-col bg-[#111714] dark group/design-root overflow-x-hidden" style='font-family: "Spline Sans", "Noto Sans", sans-serif;'>
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-gray-800 px-10 py-4">
+<div class="flex items-center gap-4 text-white">
+<div class="w-8 h-8 rounded-full bg-[var(--primary-color)] flex items-center justify-center">
+<span class="material-symbols-outlined text-black">
+                    functions
+                </span>
+</div>
+<h2 class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">Math AI</h2>
+</div>
+<div class="flex flex-1 justify-center gap-8">
+<nav class="flex items-center gap-6">
+<a class="text-gray-300 hover:text-white text-sm font-medium leading-normal transition-colors" href="#">Home</a>
+<a class="text-white text-sm font-medium leading-normal" href="#">Topics</a>
+<a class="text-gray-300 hover:text-white text-sm font-medium leading-normal transition-colors" href="#">Practice</a>
+<a class="text-gray-300 hover:text-white text-sm font-medium leading-normal transition-colors" href="#">Community</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 w-10 bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+<div class="text-white" data-icon="Bell" data-size="20px" data-weight="regular">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"></path>
+</svg>
+</div>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDZ53PLWG_4sW6jMj-TmIB1QvYSL7E37aaO0hELZ1l_HCRdm4I1-GPL7OljHyIiUcCA3LmmNuwGjxDoF5vFUF1eYyheQQ9CKNdt9oZOWO-PL-gjAMMyJlpAnoSazEgfmGpUv13rtZqXOk3yMjmU7u1Mf6c7HH-oYihVFbMpAWEWyJn-5-rSQgZcWS_7fThkBLMKlt2pe9_DXRgXxSTjBunPCrf7Xf6kZmk-9h0eQLPZD6VtzJanVrLgFcT7bBY-U102kmCqJ5Xt9Pk");'></div>
+</div>
+</header>
+<main class="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-10">
+<div class="layout-content-container flex flex-col max-w-4xl flex-1">
+<div class="flex flex-wrap justify-between gap-4 p-4 items-center">
+<h1 class="text-white tracking-tight text-4xl font-bold leading-tight">Calculus I</h1>
+<span class="inline-flex items-center rounded-full bg-green-900/50 px-3 py-1 text-sm font-medium text-[var(--primary-color)]">Chapter 1</span>
+</div>
+<div class="p-4 space-y-8">
+<div>
+<h2 class="text-white text-2xl font-bold leading-tight tracking-[-0.015em] pb-3">Introduction to Limits</h2>
+<p class="text-gray-300 text-lg font-normal leading-relaxed">
+                  Limits are a fundamental concept in calculus that describe the behavior of a function as its input approaches a particular value. They help us understand how a
+                  function behaves near a point, even if the function is not defined at that point itself. In essence, a limit tells us what value a function 'approaches' as its input
+                  gets closer and closer to a specific value.
+                </p>
+</div>
+<div>
+<h2 class="text-white text-2xl font-bold leading-tight tracking-[-0.015em] pb-3">Formal Definition of a Limit</h2>
+<p class="text-gray-300 text-lg font-normal leading-relaxed">
+                  The formal definition of a limit states that for a function f(x), the limit as x approaches a value c is L if, for every number ε &gt; 0, there exists a number δ &gt;
+                  0 such that if 0 &lt; |x - c| &lt; δ, then |f(x) - L| &lt; ε. This means that we can make the values of f(x) arbitrarily close to L by making x sufficiently close to
+                  c, but not equal to c.
+                </p>
+</div>
+<div>
+<h2 class="text-white text-2xl font-bold leading-tight tracking-[-0.015em] pb-3">Examples of Limits</h2>
+<p class="text-gray-300 text-lg font-normal leading-relaxed mb-6">
+                  Let's consider a few examples to illustrate the concept of limits. Example 1: Find the limit of f(x) = 2x + 1 as x approaches 3. As x gets closer to 3, f(x)
+                  approaches 2(3) + 1 = 7. Therefore, the limit of f(x) as x approaches 3 is 7. Example 2: Find the limit of g(x) = (x^2 - 1) / (x - 1) as x approaches 1. Notice that
+                  g(x) is not defined at x = 1. However, we can simplify g(x) to g(x) = x + 1 for x ≠ 1. As x approaches 1, g(x) approaches 1 + 1 = 2. Thus, the limit of g(x) as x
+                  approaches 1 is 2.
+                </p>
+<div class="w-full grow bg-[#111714] @container">
+<div class="w-full overflow-hidden bg-[#111714] aspect-[3/2] rounded-2xl flex">
+<div class="w-full bg-center bg-no-repeat bg-cover aspect-auto rounded-none flex-1" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAfV0Xyyu85CAM7isBiAURWaSuIF0SdjX65YsFFX-LIDd2pv8oJKH4VNcT1ztOBHqxTLYUN6UqlpyA-vgZIk3B_tx4bjY1rrfu5LUlTiPYxrDXog8eUFKuwPo2QcMxl-5tO_k5HuTgUTic_yTALhPhPY8rPyebaiLYqJLUpFNpwBjIaYbWJdogr8XI9l2OYDY15ncojKcS1I1mLpi3hdRUULEeRQkdPKnrXkMCrDUXPDv84sw5KqRneJw703eSmcVcs6nbCO6KyGY8");'></div>
+</div>
+</div>
+</div>
+<div>
+<h2 class="text-white text-2xl font-bold leading-tight tracking-[-0.015em] pb-3">Techniques for Evaluating Limits</h2>
+<p class="text-gray-300 text-lg font-normal leading-relaxed">
+                  There are several techniques for evaluating limits, including: Direct Substitution: If the function is continuous at the point, simply substitute the value into the
+                  function. Factoring and Simplifying: Simplify the function algebraically before substituting. L'Hôpital's Rule: Apply this rule when the limit results in an
+                  indeterminate form (e.g., 0/0 or ∞/∞).
+                </p>
+</div>
+<div>
+<h2 class="text-white text-2xl font-bold leading-tight tracking-[-0.015em] pb-3">Conclusion</h2>
+<p class="text-gray-300 text-lg font-normal leading-relaxed">
+                  Understanding limits is crucial for grasping more advanced calculus concepts such as derivatives and integrals. By mastering limits, you'll be well-prepared to tackle
+                  complex mathematical problems and gain a deeper appreciation for the beauty of calculus.
+                </p>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>
