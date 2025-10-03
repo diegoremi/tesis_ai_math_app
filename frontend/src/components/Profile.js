@@ -1,10 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
-import { getProfile, updateProfile } from '../services/api';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Profile.css';
-
+import { getProfile, updateProfile } from '../services/api';
 import PasswordChange from './auth/PasswordChange';
+
+const fieldLabel = {
+  first_name: 'Nombre',
+  last_name: 'Apellido',
+  email: 'Correo',
+  age: 'Edad',
+  education_level: 'Nivel educativo',
+  goal: 'Objetivo',
+  role: 'Rol',
+};
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -21,9 +29,9 @@ const Profile = () => {
         setUser(response.data);
         setFormData(response.data);
       } catch (err) {
-        setError('Failed to fetch profile');
         console.error(err);
-        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+        setError('No pudimos cargar tu perfil.');
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
           localStorage.removeItem('token');
           navigate('/');
         }
@@ -35,12 +43,13 @@ const Profile = () => {
     fetchProfile();
   }, [navigate]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setLoading(true);
     setError(null);
 
@@ -48,85 +57,179 @@ const Profile = () => {
       const response = await updateProfile(formData);
       setUser(response.data);
       setIsEditing(false);
-      alert('Profile updated successfully!');
     } catch (err) {
-      setError('Failed to update profile');
       console.error(err);
+      setError('No pudimos actualizar tus datos.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCancelEdit = () => {
+    setFormData(user);
+    setIsEditing(false);
+  };
+
   if (loading) {
-    return <div>Loading profile...</div>;
+    return (
+      <div className="min-h-screen bg-[#0b1210] text-white flex items-center justify-center">
+        <p className="text-sm text-[#9eb7a8]">Cargando perfil…</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <div className="min-h-screen bg-[#0b1210] text-white flex items-center justify-center">
+        <p className="text-sm text-red-300">{error}</p>
+      </div>
+    );
   }
 
   if (!user) {
-    return <div>No user data found.</div>;
+    return (
+      <div className="min-h-screen bg-[#0b1210] text-white flex items-center justify-center">
+        <p className="text-sm text-[#9eb7a8]">No encontramos información del perfil.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="profile-container">
-      <div className="profile-header">
-        <h2>User Profile</h2>
-        <button onClick={() => navigate('/dashboard')}>Back to Dashboard</button>
-      </div>
-      <div className="profile-card">
-        {!isEditing ? (
-          <div className="profile-info">
-            <p><strong>First Name:</strong> {user.first_name}</p>
-            <p><strong>Last Name:</strong> {user.last_name}</p>
-            <p><strong>Email:</strong> {user.email}</p>
-            <p><strong>Age:</strong> {user.age}</p>
-            <p><strong>Education Level:</strong> {user.education_level}</p>
-            <p><strong>Goal:</strong> {user.goal}</p>
-            <p><strong>Role:</strong> {user.role}</p>
-            <div className="profile-actions">
-              <button onClick={() => setIsEditing(true)}>Edit Profile</button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="profile-form">
-            <div>
-              <label>First Name:</label>
-              <input type="text" name="first_name" value={formData.first_name || ''} onChange={handleChange} />
-            </div>
-            <div>
-              <label>Last Name:</label>
-              <input type="text" name="last_name" value={formData.last_name || ''} onChange={handleChange} />
-            </div>
-            <div>
-              <label>Email:</label>
-              <input type="email" name="email" value={formData.email || ''} onChange={handleChange} disabled />
-            </div>
-            <div>
-              <label>Age:</label>
-              <input type="number" name="age" value={formData.age || ''} onChange={handleChange} />
-            </div>
-            <div>
-              <label>Education Level:</label>
-              <input type="text" name="education_level" value={formData.education_level || ''} onChange={handleChange} />
-            </div>
-            <div>
-              <label>Goal:</label>
-              <input type="text" name="goal" value={formData.goal || ''} onChange={handleChange} />
-            </div>
-            <div>
-              <label>Password (leave blank to keep current):</label>
-              <input type="password" name="password" value={formData.password || ''} onChange={handleChange} />
-            </div>
-            <div className="profile-actions">
-              <button type="submit" disabled={loading}>Update Profile</button>
-              <button type="button" onClick={() => setIsEditing(false)}>Cancel</button>
-            </div>
-          </form>
-        )}
-        <PasswordChange />
-      </div>
+    <div
+      className="min-h-screen bg-[#0b1210] text-white"
+      style={{ fontFamily: '"Spline Sans", "Noto Sans", sans-serif' }}
+    >
+      <header className="flex items-center justify-between border-b border-[#1f2c26] bg-[#0f1713] px-6 md:px-10 py-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Perfil</p>
+          <h1 className="text-xl font-semibold">Configuración de cuenta</h1>
+        </div>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-[#203028] px-5 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+        >
+          Volver al panel
+        </button>
+      </header>
+
+      <main className="px-6 md:px-10 py-10">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+          <section className="rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+            <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Información general</p>
+                <h2 className="text-2xl font-bold">{user.first_name ? `Hola, ${user.first_name}` : 'Tu perfil'}</h2>
+              </div>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90"
+              >
+                Editar datos
+              </button>
+            </header>
+
+            <dl className="mt-6 grid gap-4 md:grid-cols-2">
+              {Object.entries(fieldLabel).map(([key, label]) => (
+                <div key={key} className="rounded-2xl border border-[#1f2c26] bg-[#0d1612] px-4 py-3">
+                  <dt className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">{label}</dt>
+                  <dd className="mt-1 text-sm font-semibold text-white">
+                    {user[key] ?? '—'}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          {isEditing && (
+            <section className="rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+              <header className="mb-6 space-y-1">
+                <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Editar</p>
+                <h2 className="text-xl font-semibold">Actualizar información personal</h2>
+              </header>
+              <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[#cbe0d7]">Nombre</span>
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={formData.first_name || ''}
+                    onChange={handleChange}
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[#cbe0d7]">Apellido</span>
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={formData.last_name || ''}
+                    onChange={handleChange}
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[#cbe0d7]">Correo</span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email || ''}
+                    disabled
+                    className="w-full cursor-not-allowed rounded-full border border-[#203028] bg-[#18211d] px-4 py-3 text-[#6aa58e]"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[#cbe0d7]">Edad</span>
+                  <input
+                    type="number"
+                    name="age"
+                    value={formData.age || ''}
+                    onChange={handleChange}
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[#cbe0d7]">Nivel educativo</span>
+                  <input
+                    type="text"
+                    name="education_level"
+                    value={formData.education_level || ''}
+                    onChange={handleChange}
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[#cbe0d7]">Objetivo</span>
+                  <input
+                    type="text"
+                    name="goal"
+                    value={formData.goal || ''}
+                    onChange={handleChange}
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  />
+                </label>
+                <div className="md:col-span-2 flex flex-wrap gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    Guardar cambios
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="inline-flex h-11 items-center justify-center rounded-full border border-[#203028] px-6 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
+
+          <PasswordChange />
+        </div>
+      </main>
     </div>
   );
 };

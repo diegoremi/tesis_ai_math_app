@@ -100,45 +100,49 @@ const Survey = () => {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 text-center text-gray-600 pt-20">Cargando encuesta…</div>;
+    return (
+      <div className="min-h-screen bg-[#0b1210] text-white flex items-center justify-center">
+        <p className="text-sm text-[#9eb7a8]">Cargando encuesta…</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900" style={{ fontFamily: 'Inter, "Noto Sans", sans-serif' }}>
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-10 py-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 flex items-center justify-center rounded-full bg-blue-100 text-[#137fec] font-semibold">AI</div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-500">Encuesta</p>
-            <h1 className="text-xl font-semibold">Satisfacción con la plataforma</h1>
-          </div>
+    <div
+      className="min-h-screen bg-[#0b1210] text-white"
+      style={{ fontFamily: '"Spline Sans", "Noto Sans", sans-serif' }}
+    >
+      <header className="flex items-center justify-between border-b border-[#1f2c26] bg-[#0f1713] px-6 md:px-10 py-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Encuesta</p>
+          <h1 className="text-xl font-semibold">Satisfacción con la plataforma</h1>
         </div>
-        <span className="text-sm text-gray-500">Sesión {new Date().toLocaleDateString()}</span>
+        <span className="text-sm text-[#6aa58e]">Sesión {new Date().toLocaleDateString()}</span>
       </header>
 
-      <main className="px-6 py-12 flex justify-center bg-gray-50">
-        <form onSubmit={handleSubmit} className="w-full max-w-3xl bg-white border border-gray-200 rounded-3xl shadow-sm">
-          <div className="px-8 py-12 space-y-8">
+      <main className="px-6 md:px-10 py-10">
+        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+          <section className="rounded-3xl border border-[#203028] bg-[#101a17] px-6 md:px-8 py-10 shadow-lg">
             <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold tracking-tight text-gray-900">Tu opinión es clave</h2>
-              <p className="text-sm text-gray-600">Cuéntanos cómo te acompañó la plataforma esta semana.</p>
+              <h2 className="text-3xl font-bold text-white">Tu opinión es clave</h2>
+              <p className="text-sm text-[#94b1a3]">Contanos cómo fue tu experiencia esta semana. Cada respuesta ayuda a mejorar el tutor.</p>
             </div>
 
-            <div className="space-y-6">
+            <div className="mt-8 space-y-6">
               {items.map((item) => {
                 const key = item.survey_item_id ?? item.id;
                 return (
-                  <div key={key} className="rounded-2xl border border-gray-200 p-6">
-                    <p className="text-base font-semibold text-gray-800">{item.prompt ?? item.question}</p>
+                  <div key={key} className="rounded-2xl border border-[#1f2c26] bg-[#0d1612] p-6">
+                    <p className="text-base font-semibold text-white">{item.prompt ?? item.question}</p>
                     <div className="mt-4 flex items-center justify-between gap-3">
-                      <span className="text-xs text-gray-500">1</span>
+                      <span className="text-xs text-[#6aa58e]">1</span>
                       <div className="flex flex-1 justify-center gap-2">
                         {likertOptions.map((value) => (
                           <div key={value}>
                             <input
                               type="radio"
                               id={`item-${key}-${value}`}
-                              className="hidden"
+                              className="peer hidden"
                               checked={responses[key] === value}
                               onChange={() => handleSelect(key, value)}
                             />
@@ -146,8 +150,8 @@ const Survey = () => {
                               htmlFor={`item-${key}-${value}`}
                               className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold cursor-pointer transition ${
                                 responses[key] === value
-                                  ? 'border-[#137fec] bg-[#e8f2fe] text-[#137fec]'
-                                  : 'border-gray-200 text-gray-600 hover:border-[#137fec] hover:text-[#137fec]'
+                                  ? 'border-[var(--primary-color)] bg-[var(--primary-color)]/15 text-[var(--primary-color)]'
+                                  : 'border-[#1f2c26] text-[#9eb7a8] hover:border-[var(--primary-color)]/60 hover:text-white'
                               }`}
                             >
                               {value}
@@ -155,52 +159,70 @@ const Survey = () => {
                           </div>
                         ))}
                       </div>
-                      <span className="text-xs text-gray-500">5</span>
+                      <span className="text-xs text-[#6aa58e]">5</span>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="space-y-3">
-              <label htmlFor="comments" className="block text-sm font-medium text-gray-700">
+            <div className="mt-8 space-y-2">
+              <label className="text-sm font-medium text-[#cbe0d7]" htmlFor="comments">
                 Comentarios adicionales
               </label>
               <textarea
                 id="comments"
+                className="w-full rounded-3xl border border-[#203028] bg-[#0d1612] px-4 py-3 text-sm text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                rows={4}
+                placeholder="¿Qué funcionó mejor? ¿Qué podemos mejorar?"
                 value={comments}
                 onChange={(event) => setComments(event.target.value)}
-                rows={4}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:border-[#137fec] focus:outline-none focus:ring-1 focus:ring-[#137fec]"
-                placeholder="¿Qué funcionó mejor? ¿Qué podemos mejorar?"
               />
             </div>
+          </section>
 
-            {notice && (
-              <div
-                className={`rounded-2xl border px-4 py-3 text-sm ${
-                  notice.type === 'success'
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                    : 'border-red-300 bg-red-50 text-red-600'
-                }`}
-              >
-                {notice.message}
-              </div>
-            )}
-          </div>
-
-          <div className="px-8 py-6 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-gray-500">
-              Promedio utilidad: <span className="font-semibold text-gray-700">{aggregates.perceived_utility ?? '—'}</span>
-            </div>
-            <button
-              type="submit"
-              disabled={submitting || items.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#137fec] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0d6fd0] disabled:opacity-70"
+          {notice && (
+            <div
+              className={`rounded-3xl border px-5 py-4 text-sm ${
+                notice.type === 'error'
+                  ? 'border-red-500/40 bg-red-500/10 text-red-200'
+                  : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+              }`}
             >
-              {submitting ? 'Enviando…' : 'Enviar respuestas'}
-            </button>
-          </div>
+              {notice.message}
+            </div>
+          )}
+
+          <section className="rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="grid grid-cols-2 gap-4 text-sm text-[#94b1a3]">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Utilidad</p>
+                  <p className="mt-1 text-base font-semibold text-white">{aggregates.perceived_utility ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Facilidad</p>
+                  <p className="mt-1 text-base font-semibold text-white">{aggregates.ease_of_use ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Motivación</p>
+                  <p className="mt-1 text-base font-semibold text-white">{aggregates.motivation ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Autonomía</p>
+                  <p className="mt-1 text-base font-semibold text-white">{aggregates.autonomy ?? '—'}</p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting || items.length === 0}
+                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--primary-color)] px-8 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {submitting ? 'Enviando…' : 'Enviar respuestas'}
+              </button>
+            </div>
+          </section>
         </form>
       </main>
     </div>

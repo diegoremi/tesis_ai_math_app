@@ -18,6 +18,38 @@ const Exercises = () => {
   const [hint, setHint] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const SUPERSCRIPT_MAP = {
+    0: "⁰",
+    1: "¹",
+    2: "²",
+    3: "³",
+    4: "⁴",
+    5: "⁵",
+    6: "⁶",
+    7: "⁷",
+    8: "⁸",
+    9: "⁹",
+  };
+
+  const toSuperscript = (text = "") =>
+    String(text).replace(/\^([0-9]+)/g, (_, digits) =>
+      digits
+        .split("")
+        .map((digit) => SUPERSCRIPT_MAP[digit] ?? digit)
+        .join("")
+    );
+
+  const renderText = (value = "") => {
+    const superscript = toSuperscript(value);
+    const parts = superscript.split(/\n+/);
+    return parts.map((part, index) => (
+      <span key={`${part}-${index}`}>
+        {part}
+        {index < parts.length - 1 && <br />}
+      </span>
+    ));
+  };
+
   useEffect(() => {
     fetchExercise();
   }, []);
@@ -128,7 +160,7 @@ const Exercises = () => {
           <div className="relative space-y-4 rounded-2xl bg-[#1c2620] p-6 shadow-lg">
             <div className="space-y-2">
               <p className="text-sm uppercase tracking-[0.2em] text-[#9eb7a8]">Ejercicio</p>
-              <h2 className="text-2xl font-bold">{exercise.stem}</h2>
+              <h2 className="text-2xl font-bold">{renderText(exercise.stem)}</h2>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               {hasOptions ? (
@@ -144,7 +176,7 @@ const Exercises = () => {
                           : 'border-[#3d5245] bg-[#111714] text-[#d2e4da] hover:border-[var(--primary-color)]/60'
                       }`}
                     >
-                      {option.label}
+                      {renderText(option.label)}
                     </button>
                   ))}
                 </div>

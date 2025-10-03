@@ -1,8 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import axios from 'axios';
 import { logEvent } from './event.service.js';
 
 const prisma = new PrismaClient();
+
+const logTheory = (...args: unknown[]) => {
+  console.log('[theory]', ...args);
+};
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 
@@ -53,6 +57,7 @@ export const generateTheoryModule = async (userId: number, payload: GenerateTheo
   });
 
   if (existingModule) {
+    logTheory('reusing existing module', { userId, moduleIndex: existingModule.module_index, moduleId: existingModule.module_id });
     const progress = existingModule.progress[0] ?? null;
     return {
       module: existingModule,
@@ -112,10 +117,12 @@ export const generateTheoryModule = async (userId: number, payload: GenerateTheo
   let generated;
 
   try {
+    logTheory('requesting theory module from AI', { userId, moduleIndex });
     const response = await axios.post(`${AI_SERVICE_URL}/generate/theory-module`, requestPayload);
     generated = response.data;
+    logTheory('received theory module from AI', { userId, moduleIndex, hasSections: Array.isArray(generated?.sections) });
   } catch (error) {
-    console.error('generateTheoryModule AI error:', error);
+    console.error('[theory] AI generation failed, using fallback', { userId, moduleIndex, error: (error as Error).message });
     generated = createFallbackModule(requestPayload);
   }
 
@@ -123,16 +130,36 @@ export const generateTheoryModule = async (userId: number, payload: GenerateTheo
     throw new Error('AI response malformed for theory module');
   }
 
-  const moduleRecord = await prisma.theoryModule.create({
-    data: {
-      user_id: userId,
-      module_index: moduleIndex,
-      title: String(generated.title ?? `Módulo ${moduleIndex + 1}`),
-      description: typeof generated.description === 'string' ? generated.description : null,
-      content: generated,
-      version: generated.version ?? 'v1',
-    },
-  });
+  let moduleRecord;
+
+  try {
+    moduleRecord = await prisma.theoryModule.create({
+      data: {
+        user_id: userId,
+        module_index: moduleIndex,
+        title: String(generated.title ?? `Módulo ${moduleIndex + 1}`),
+        description: typeof generated.description === 'string' ? generated.description : null,
+        content: generated,
+        version: generated.version ?? 'v1',
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      moduleRecord = await prisma.theoryModule.findUnique({
+        where: {
+          user_id_module_index: {
+            user_id: userId,
+            module_index: moduleIndex,
+          },
+        },
+      });
+      if (!moduleRecord) {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
 
   const progressRecord = await prisma.theoryProgress.upsert({
     where: {
@@ -147,6 +174,8 @@ export const generateTheoryModule = async (userId: number, payload: GenerateTheo
       user_id: userId,
     },
   });
+
+  logTheory('stored new theory module', { userId, moduleId: moduleRecord.module_id, moduleIndex });
 
   return {
     module: moduleRecord,
@@ -205,6 +234,7 @@ export const updateTheoryProgress = async (userId: number, payload: TheoryProgre
       event_type: 'theory_start',
       metadata: { module_id: moduleId, module_index: module.module_index },
     });
+    logTheory('theory module started', { userId, moduleId, moduleIndex: module.module_index });
   }
 
   await logEvent(userId, {
@@ -217,6 +247,14 @@ export const updateTheoryProgress = async (userId: number, payload: TheoryProgre
     },
   });
 
+  logTheory('theory progress recorded', {
+    userId,
+    moduleId,
+    moduleIndex: module.module_index,
+    progress: nextProgress,
+    secondsSpent: updated.seconds_spent,
+  });
+
   if (nextProgress >= 1 && (!existingProgress || !existingProgress.completed_at)) {
     await logEvent(userId, {
       event_type: 'theory_end',
@@ -226,6 +264,7 @@ export const updateTheoryProgress = async (userId: number, payload: TheoryProgre
         total_seconds: updated.seconds_spent,
       },
     });
+    logTheory('theory module completed', { userId, moduleId, moduleIndex: module.module_index });
   }
 
   return updated;
@@ -286,6 +325,7 @@ export const submitTheoryCheckpoint = async (userId: number, payload: TheoryChec
         module_index: module.module_index,
       },
     });
+    logTheory('checkpoint passed', { userId, moduleId, moduleIndex: module.module_index });
   }
 
   return {
@@ -310,6 +350,14 @@ export const getStudyStatus = async (userId: number) => {
   const secondsSpent = progressRecords.reduce((sum, record) => sum + (record.seconds_spent ?? 0), 0);
 
   const posttestUnlocked = modulesCompleted >= MIN_MODULES_REQUIRED && checkpointsPassed >= MIN_CHECKPOINTS_REQUIRED;
+
+  logTheory('study status computed', {
+    userId,
+    modulesGenerated: modules.length,
+    modulesCompleted,
+    checkpointsPassed,
+    posttestUnlocked,
+  });
 
   return {
     modulesCompleted,

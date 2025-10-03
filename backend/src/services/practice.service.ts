@@ -1,17 +1,38 @@
-import axios from 'axios';
-import crypto from 'crypto';
+import axios from "axios";
+import crypto from "crypto";
 import {
   PrismaClient,
   AssessmentType,
   EducationLevel,
   PracticeItemStatus,
   DifficultyLevel,
-} from '@prisma/client';
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-type Topic = 'aritmética' | 'porcentajes' | 'álgebra';
-type Difficulty = 'basico' | 'medio';
+const logPractice = (...args: unknown[]) => {
+  console.log("[practice]", ...args);
+};
+
+const extractJsonString = (raw: string): string => {
+  if (!raw) {
+    throw new Error("Respuesta vacía del modelo");
+  }
+  let text = raw.trim();
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) {
+    text = (fenced[1] ?? "").trim();
+  }
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    text = text.slice(firstBrace, lastBrace + 1);
+  }
+  return text;
+};
+
+type Topic = "aritmética" | "porcentajes" | "álgebra";
+type Difficulty = "basico" | "medio";
 
 type PracticeOption = { key: string; text: string };
 
@@ -19,12 +40,16 @@ type PracticeItem = {
   id: string;
   stem: string;
   options: PracticeOption[];
-  correct_key: 'A' | 'B' | 'C' | 'D';
+  correct_key: "A" | "B" | "C" | "D";
   explain_correct: string;
-  explain_incorrect: Record<'A' | 'B' | 'C' | 'D', string>;
+  explain_incorrect: Record<"A" | "B" | "C" | "D", string>;
   meta: {
     domain: Topic;
-    skill: 'operaciones' | 'razones_y_porcentajes' | 'ecuaciones_lineales' | 'simplificacion';
+    skill:
+      | "operaciones"
+      | "razones_y_porcentajes"
+      | "ecuaciones_lineales"
+      | "simplificacion";
     estimated_time_sec: number;
   };
 };
@@ -32,7 +57,7 @@ type PracticeItem = {
 type PracticePayload = {
   session_id: string;
   seed: number;
-  locale: 'es-PE';
+  locale: "es-PE";
   topic: Topic;
   difficulty: Difficulty;
   items: PracticeItem[];
@@ -49,84 +74,89 @@ type GenerationContext = {
   difficulty: Difficulty;
 };
 
-const DEFAULT_TOPICS: Topic[] = ['aritmética', 'porcentajes', 'álgebra'];
+const DEFAULT_TOPICS: Topic[] = ["aritmética", "porcentajes", "álgebra"];
 
 const topicDifficulty: Record<Topic, DifficultyLevel> = {
-  aritmética: 'basic',
-  porcentajes: 'intermediate',
-  álgebra: 'advanced',
+  aritmética: "basic",
+  porcentajes: "intermediate",
+  álgebra: "advanced",
 };
 
-const provider = (process.env.AI_PROVIDER ?? 'openai').toLowerCase();
+const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
 
 const isPracticeOption = (value: unknown): value is PracticeOption => {
   return (
-    typeof value === 'object' &&
+    typeof value === "object" &&
     value !== null &&
-    typeof (value as PracticeOption).key === 'string' &&
-    typeof (value as PracticeOption).text === 'string'
+    typeof (value as PracticeOption).key === "string" &&
+    typeof (value as PracticeOption).text === "string"
   );
 };
 
 const isPracticeItem = (value: unknown): value is PracticeItem => {
-  if (typeof value !== 'object' || value === null) {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
   const item = value as PracticeItem;
   if (
-    typeof item.id !== 'string' ||
-    typeof item.stem !== 'string' ||
+    typeof item.id !== "string" ||
+    typeof item.stem !== "string" ||
     !Array.isArray(item.options) ||
     item.options.length !== 4 ||
     !item.options.every(isPracticeOption)
   ) {
     return false;
   }
-  if (!['A', 'B', 'C', 'D'].includes(item.correct_key)) {
+  if (!["A", "B", "C", "D"].includes(item.correct_key)) {
     return false;
   }
-  if (typeof item.explain_correct !== 'string') {
+  if (typeof item.explain_correct !== "string") {
     return false;
   }
   const incorrect = item.explain_incorrect;
   if (
-    typeof incorrect !== 'object' ||
+    typeof incorrect !== "object" ||
     incorrect === null ||
-    !['A', 'B', 'C', 'D'].every((key) => typeof incorrect[key as 'A'] === 'string')
-  ) {
-    return false;
-  }
-  if (!item.meta || typeof item.meta !== 'object') {
-    return false;
-  }
-  const meta = item.meta;
-  if (!['aritmética', 'porcentajes', 'álgebra'].includes(meta.domain)) {
-    return false;
-  }
-  if (
-    !['operaciones', 'razones_y_porcentajes', 'ecuaciones_lineales', 'simplificacion'].includes(
-      meta.skill,
+    !["A", "B", "C", "D"].every(
+      (key) => typeof incorrect[key as "A"] === "string"
     )
   ) {
     return false;
   }
-  if (typeof meta.estimated_time_sec !== 'number') {
+  if (!item.meta || typeof item.meta !== "object") {
+    return false;
+  }
+  const meta = item.meta;
+  if (!["aritmética", "porcentajes", "álgebra"].includes(meta.domain)) {
+    return false;
+  }
+  if (
+    ![
+      "operaciones",
+      "razones_y_porcentajes",
+      "ecuaciones_lineales",
+      "simplificacion",
+    ].includes(meta.skill)
+  ) {
+    return false;
+  }
+  if (typeof meta.estimated_time_sec !== "number") {
     return false;
   }
   return true;
 };
 
 const isPracticePayload = (value: unknown): value is PracticePayload => {
-  if (typeof value !== 'object' || value === null) {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
   const payload = value as PracticePayload;
   if (
-    typeof payload.session_id !== 'string' ||
-    typeof payload.seed !== 'number' ||
-    payload.locale !== 'es-PE' ||
-    !['aritmética', 'porcentajes', 'álgebra'].includes(payload.topic) ||
-    !['basico', 'medio'].includes(payload.difficulty) ||
+    typeof payload.session_id !== "string" ||
+    typeof payload.seed !== "number" ||
+    payload.locale !== "es-PE" ||
+    !["aritmética", "porcentajes", "álgebra"].includes(payload.topic) ||
+    !["basico", "medio"].includes(payload.difficulty) ||
     !Array.isArray(payload.items) ||
     payload.items.length === 0 ||
     !payload.items.every(isPracticeItem)
@@ -138,41 +168,41 @@ const isPracticePayload = (value: unknown): value is PracticePayload => {
 
 const mapEducationLevel = (level: EducationLevel | null): string => {
   switch (level) {
-    case 'high_school':
-      return 'secundaria completa';
-    case 'university':
-      return 'universitario';
-    case 'other':
+    case "high_school":
+      return "secundaria completa";
+    case "university":
+      return "universitario";
+    case "other":
     default:
-      return 'otro';
+      return "otro";
   }
 };
 
 export const mapDomainToTopic = (domain: string | null | undefined): Topic => {
   switch (domain) {
-    case 'proporciones_porcentajes':
-    case 'porcentajes':
-    case 'razones_y_porcentajes':
-    case 'porcentaje':
-      return 'porcentajes';
-    case 'algebra_basica':
-    case 'algebra':
-    case 'álgebra':
-      return 'álgebra';
-    case 'aritmetica_y_numeros':
-    case 'aritmetica':
-    case 'aritmética':
-    case 'operaciones':
+    case "proporciones_porcentajes":
+    case "porcentajes":
+    case "razones_y_porcentajes":
+    case "porcentaje":
+      return "porcentajes";
+    case "algebra_basica":
+    case "algebra":
+    case "álgebra":
+      return "álgebra";
+    case "aritmetica_y_numeros":
+    case "aritmetica":
+    case "aritmética":
+    case "operaciones":
     default:
-      return 'aritmética';
+      return "aritmética";
   }
 };
 
 const selectDifficulty = (accuracy: number | null | undefined): Difficulty => {
   if (accuracy !== undefined && accuracy !== null && accuracy >= 0.6) {
-    return 'medio';
+    return "medio";
   }
-  return 'basico';
+  return "basico";
 };
 
 const SYSTEM_PROMPT = `Eres un generador de ejercicios de matemáticas para adultos. Crea ítems de PRÁCTICA simples, de opción múltiple, alineados a aritmética, proporciones/porcentajes y álgebra básica. Cada ítem debe ser claro, sin trucos, con 1 sola respuesta correcta y 3 distractores plausibles. Muestra números razonables (enteros y decimales simples) y, si hay expresiones, usa LaTeX en el enunciado. Da siempre feedback que explique POR QUÉ la respuesta es correcta e indique el error típico de cada distractor.
@@ -210,7 +240,12 @@ schema_salida:
   ]
 }`;
 
-const buildUserPrompt = (context: GenerationContext, sessionId: string, seed: number, nItems: number) => {
+const buildUserPrompt = (
+  context: GenerationContext,
+  sessionId: string,
+  seed: number,
+  nItems: number
+) => {
   return `
 [USER]
 Genera ${nItems} ejercicio(s) de práctica independientes con las siguientes condiciones:
@@ -240,90 +275,113 @@ Reglas:
 Genera ahora.`;
 };
 
-const callOpenAI = async (systemPrompt: string, userPrompt: string): Promise<string> => {
+const callOpenAI = async (
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY no configurada');
+    throw new Error("OPENAI_API_KEY no configurada");
   }
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
+    "https://api.openai.com/v1/chat/completions",
     {
       model,
       temperature: 0.7,
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
     },
     {
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
-    },
+    }
   );
-  const content: string | undefined = response.data?.choices?.[0]?.message?.content?.trim();
+  const content: string | undefined =
+    response.data?.choices?.[0]?.message?.content?.trim();
   if (!content) {
-    throw new Error('Respuesta vacía del modelo OpenAI');
+    throw new Error("Respuesta vacía del modelo OpenAI");
   }
   return content;
 };
 
-const callGemini = async (systemPrompt: string, userPrompt: string): Promise<string> => {
+const callGemini = async (
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY no configurada');
+    throw new Error("GEMINI_API_KEY no configurada");
   }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-  const response = await axios.post(
-    url,
-    {
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: userPrompt }],
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+
+  try {
+    const response = await axios.post(
+      url,
+      {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                // concatenamos el prompt maestro + el prompt de usuario
+                text: `${systemPrompt}\n\n${userPrompt}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
         },
-      ],
-      generationConfig: {
-        temperature: 0.7,
       },
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
-  );
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
 
-  const text =
-    response.data?.candidates?.[0]?.content?.parts
-      ?.map((part: { text?: string }) => part?.text || '')
-      .join('')
-      .trim() || '';
+    const text =
+      response.data?.candidates?.[0]?.content?.parts
+        ?.map((part: { text?: string }) => part?.text || "")
+        .join("")
+        .trim() || "";
 
-  if (!text) {
-    throw new Error('Gemini devolvió una respuesta vacía');
+    if (!text) {
+      throw new Error("Gemini devolvió una respuesta vacía");
+    }
+    return text;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const detail = error.response?.data;
+      console.error("[practice] Gemini error payload", { status, detail });
+      throw new Error(
+        `Gemini error ${status ?? "unknown"}: ${JSON.stringify(detail)}`
+      );
+    }
+    throw error;
   }
-  return text;
 };
 
-const callLLM = async (systemPrompt: string, userPrompt: string): Promise<string> => {
-  if (provider === 'gemini') {
+const callLLM = async (
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> => {
+  if (provider === "gemini") {
     return callGemini(systemPrompt, userPrompt);
   }
-  if (provider === 'openai') {
+  if (provider === "openai") {
     return callOpenAI(systemPrompt, userPrompt);
   }
   throw new Error(`AI_PROVIDER ${provider} no soportado todavía`);
 };
 
 const computeWeakDomains = (
-  responses: { is_correct: boolean | null; item: { domain: string | null } }[],
+  responses: { is_correct: boolean | null; item: { domain: string | null } }[]
 ): Topic[] => {
   if (!responses.length) {
     return DEFAULT_TOPICS;
@@ -338,7 +396,10 @@ const computeWeakDomains = (
     });
   });
   const ordered = Array.from(stats.entries())
-    .map(([topic, { correct, total }]) => ({ topic, accuracy: total ? correct / total : 0 }))
+    .map(([topic, { correct, total }]) => ({
+      topic,
+      accuracy: total ? correct / total : 0,
+    }))
     .sort((a, b) => a.accuracy - b.accuracy);
   const weakest = ordered.slice(0, 2).map((entry) => entry.topic);
   return weakest.length ? weakest : DEFAULT_TOPICS;
@@ -348,11 +409,11 @@ const gatherContext = async (userId: number): Promise<GenerationContext> => {
   const user = await prisma.user.findUnique({ where: { user_id: userId } });
   const edad = user?.age ?? 22;
   const nivel_formacion = mapEducationLevel(user?.education_level ?? null);
-  const objetivo_usuario = user?.goal ?? 'mejorar mi desempeño en matemática';
+  const objetivo_usuario = user?.goal ?? "mejorar mi desempeño en matemática";
 
   const pretest = await prisma.assessment.findFirst({
     where: { user_id: userId, assessment_type: AssessmentType.pretest },
-    orderBy: { created_at: 'desc' },
+    orderBy: { created_at: "desc" },
     include: {
       responses: {
         include: {
@@ -364,14 +425,17 @@ const gatherContext = async (userId: number): Promise<GenerationContext> => {
 
   const puntaje_pretest = pretest?.total_score ?? 0;
   const dominios_debiles = computeWeakDomains(pretest?.responses ?? []);
-  const topic = dominios_debiles[0] ?? 'aritmética';
+  const topic = dominios_debiles[0] ?? "aritmética";
 
   const accuracy = (() => {
     if (!pretest || !pretest.responses.length) {
       return null;
     }
     const total = pretest.responses.length;
-    const correct = pretest.responses.reduce((acc, curr) => acc + (curr.is_correct ? 1 : 0), 0);
+    const correct = pretest.responses.reduce(
+      (acc, curr) => acc + (curr.is_correct ? 1 : 0),
+      0
+    );
     return total ? correct / total : null;
   })();
 
@@ -394,7 +458,7 @@ const storeGeneratedItem = async (
   sessionId: string,
   topic: Topic,
   difficulty: Difficulty,
-  item: PracticeItem,
+  item: PracticeItem
 ) => {
   return prisma.practiceGenerated.create({
     data: {
@@ -409,11 +473,11 @@ const storeGeneratedItem = async (
 
 const fallbackFromSeed = async (): Promise<PracticeItem> => {
   const fallbackItem = await prisma.assessmentItem.findFirst({
-    where: { test_version: 'practice_v1' },
-    orderBy: { item_id: 'asc' },
+    where: { test_version: "practice_v1" },
+    orderBy: { item_id: "asc" },
   });
   if (!fallbackItem) {
-    throw new Error('No hay ejercicios de práctica configurados');
+    throw new Error("No hay ejercicios de práctica configurados");
   }
 
   const optionsArray = Array.isArray(fallbackItem.options)
@@ -421,13 +485,16 @@ const fallbackFromSeed = async (): Promise<PracticeItem> => {
     : [];
 
   const normalizedOptions: PracticeOption[] = optionsArray.map((raw, index) => {
-    const key = typeof raw?.key === 'string' ? raw.key : ['A', 'B', 'C', 'D'][index] ?? 'A';
+    const key =
+      typeof raw?.key === "string"
+        ? raw.key
+        : ["A", "B", "C", "D"][index] ?? "A";
     const textCandidate =
-      typeof raw?.text === 'string'
+      typeof raw?.text === "string"
         ? raw.text
-        : typeof raw?.label === 'string'
-          ? (raw.label as string)
-          : String(raw ?? '');
+        : typeof raw?.label === "string"
+        ? (raw.label as string)
+        : String(raw ?? "");
     return {
       key,
       text: textCandidate,
@@ -438,17 +505,20 @@ const fallbackFromSeed = async (): Promise<PracticeItem> => {
     id: `LEGACY-${fallbackItem.item_id}`,
     stem: fallbackItem.stem,
     options: normalizedOptions,
-    correct_key: (fallbackItem.correct_key || 'A').toUpperCase() as PracticeItem['correct_key'],
-    explain_correct: 'Revisa el procedimiento paso a paso y verifica tus cálculos.',
+    correct_key: (
+      fallbackItem.correct_key || "A"
+    ).toUpperCase() as PracticeItem["correct_key"],
+    explain_correct:
+      "Revisa el procedimiento paso a paso y verifica tus cálculos.",
     explain_incorrect: {
-      A: 'Analiza si aplicaste la operación correcta.',
-      B: 'Analiza si aplicaste la operación correcta.',
-      C: 'Analiza si aplicaste la operación correcta.',
-      D: 'Analiza si aplicaste la operación correcta.',
+      A: "Analiza si aplicaste la operación correcta.",
+      B: "Analiza si aplicaste la operación correcta.",
+      C: "Analiza si aplicaste la operación correcta.",
+      D: "Analiza si aplicaste la operación correcta.",
     },
     meta: {
       domain: mapDomainToTopic(fallbackItem.domain ?? null),
-      skill: 'operaciones',
+      skill: "operaciones",
       estimated_time_sec: 60,
     },
   };
@@ -457,10 +527,11 @@ const fallbackFromSeed = async (): Promise<PracticeItem> => {
 export const fetchNextPracticeItem = async (userId: number) => {
   let candidate = await prisma.practiceGenerated.findFirst({
     where: { user_id: userId, status: PracticeItemStatus.generated },
-    orderBy: { created_at: 'asc' },
+    orderBy: { created_at: "asc" },
   });
 
   if (!candidate) {
+    logPractice("no pending item, generating via LLM", { userId });
     const context = await gatherContext(userId);
     const sessionId = crypto.randomUUID();
     const seed = Math.floor(Math.random() * 1_000_000_000);
@@ -468,12 +539,12 @@ export const fetchNextPracticeItem = async (userId: number) => {
 
     try {
       const raw = await callLLM(SYSTEM_PROMPT, userPrompt);
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(extractJsonString(raw));
       if (!isPracticePayload(parsed)) {
-        throw new Error('Payload IA inválido');
+        throw new Error("Payload IA inválido");
       }
       if (!parsed.items.length) {
-        throw new Error('Payload IA sin items');
+        throw new Error("Payload IA sin items");
       }
       const item = parsed.items[0]!;
       candidate = await storeGeneratedItem(
@@ -481,16 +552,45 @@ export const fetchNextPracticeItem = async (userId: number) => {
         parsed.session_id,
         parsed.topic,
         parsed.difficulty,
-        item,
+        item
       );
+      logPractice("generated item via LLM", {
+        userId,
+        sessionId: parsed.session_id,
+        topic: parsed.topic,
+        difficulty: parsed.difficulty,
+        itemId: item.id,
+      });
     } catch (error) {
-      console.error('Fallo IA, usando fallback:', error);
+      console.error("[practice] LLM failure, using fallback", {
+        userId,
+        error: (error as Error).message,
+      });
       const fallback = await fallbackFromSeed();
-      candidate = await storeGeneratedItem(userId, sessionId, fallback.meta.domain, context.difficulty, fallback);
+      candidate = await storeGeneratedItem(
+        userId,
+        sessionId,
+        fallback.meta.domain,
+        context.difficulty,
+        fallback
+      );
+      logPractice("fallback item served", {
+        userId,
+        sessionId,
+        topic: fallback.meta.domain,
+        itemId: fallback.id,
+      });
     }
   }
 
   const item = candidate.item_json as PracticeItem;
+  logPractice("serving practice item", {
+    userId,
+    practiceGeneratedId: candidate.practice_generated_id,
+    sessionId: candidate.session_id,
+    topic: item.meta.domain,
+    difficulty: candidate.difficulty,
+  });
   return {
     record: candidate,
     item,
@@ -500,14 +600,14 @@ export const fetchNextPracticeItem = async (userId: number) => {
 const incrementActivityAggregate = async (
   userId: number,
   domain: Topic,
-  competency: PracticeItem['meta']['skill'],
-  correct: boolean,
+  competency: PracticeItem["meta"]["skill"],
+  correct: boolean
 ) => {
   const difficultyLevel = topicDifficulty[domain];
   const existing = await prisma.activity.findFirst({
     where: {
       user_id: userId,
-      activity_type: 'exercise',
+      activity_type: "exercise",
       domain,
       competency,
     },
@@ -520,18 +620,18 @@ const incrementActivityAggregate = async (
         attempts: existing.attempts + 1,
         correct_answers: existing.correct_answers + (correct ? 1 : 0),
         occurred_at: new Date(),
-        status: 'completed',
+        status: "completed",
       },
     });
   } else {
     await prisma.activity.create({
       data: {
         user_id: userId,
-        activity_type: 'exercise',
+        activity_type: "exercise",
         difficulty_level: difficultyLevel,
         attempts: 1,
         correct_answers: correct ? 1 : 0,
-        status: 'completed',
+        status: "completed",
         domain,
         competency,
       },
@@ -542,13 +642,13 @@ const incrementActivityAggregate = async (
 export const submitPracticeAnswer = async (
   userId: number,
   practiceGeneratedId: number,
-  userAnswer: string,
+  userAnswer: string
 ) => {
   const record = await prisma.practiceGenerated.findUnique({
     where: { practice_generated_id: practiceGeneratedId },
   });
   if (!record) {
-    throw new Error('Practice item not found');
+    throw new Error("Practice item not found");
   }
 
   const item = record.item_json as PracticeItem;
@@ -556,8 +656,8 @@ export const submitPracticeAnswer = async (
   const correct = normalized === item.correct_key;
   const explanation = correct
     ? item.explain_correct
-    : item.explain_incorrect[normalized as 'A' | 'B' | 'C' | 'D'] ||
-      'Revisa el procedimiento y vuelve a intentarlo.';
+    : item.explain_incorrect[normalized as "A" | "B" | "C" | "D"] ||
+      "Revisa el procedimiento y vuelve a intentarlo.";
 
   if (record.status !== PracticeItemStatus.completed) {
     await prisma.practiceGenerated.update({
@@ -581,11 +681,28 @@ export const submitPracticeAnswer = async (
     },
   });
 
-  await incrementActivityAggregate(userId, item.meta.domain, item.meta.skill, correct);
+  await incrementActivityAggregate(
+    userId,
+    item.meta.domain,
+    item.meta.skill,
+    correct
+  );
 
-  const attempts = await prisma.practiceAttempt.count({ where: { user_id: userId } });
-  const correctAttempts = await prisma.practiceAttempt.count({ where: { user_id: userId, correct: true } });
+  const attempts = await prisma.practiceAttempt.count({
+    where: { user_id: userId },
+  });
+  const correctAttempts = await prisma.practiceAttempt.count({
+    where: { user_id: userId, correct: true },
+  });
   const accuracy = attempts ? correctAttempts / attempts : 0;
+
+  logPractice("practice answer recorded", {
+    userId,
+    practiceGeneratedId,
+    correct,
+    attempts,
+    accuracy,
+  });
 
   return {
     correct,
@@ -608,7 +725,10 @@ export const getStoredPracticeItem = async (practiceGeneratedId: number) => {
   const item = record.item_json as PracticeItem;
   return {
     stem: item.stem,
-    options: item.options.map((option) => ({ key: option.key, label: option.text })),
+    options: item.options.map((option) => ({
+      key: option.key,
+      label: option.text,
+    })),
     domain: item.meta.domain,
     competency: item.meta.skill,
   };

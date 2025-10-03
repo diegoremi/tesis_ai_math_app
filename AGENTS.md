@@ -22,8 +22,8 @@ flowchart LR
 **Módulos**
 
 - **Frontend**: React/Next (assessments bloquean IA; práctica con hints; encuestas Likert). Nuevas vistas implementadas: consentimiento (`/study/consent`), pretest (`/study/pretest`), exit test (`/study/exit-test`), dashboard con gating GE/GC y encuesta de satisfacción rediseñada.
-- **Backend**: Express + Prisma (auth, asignación, feature-gating, exports).
-- **AI Service (FastAPI)**: TutorAgent (explicaciones/hints), PlannerAgent (itinerario), guardrails (redacción/PII).
+- **Backend**: Express + Prisma (auth, asignación, feature-gating, exports, generador IA de práctica).
+- **AI Service (FastAPI)**: TutorAgent (explicaciones/hints), generador de teoría (Gemini) con guardrails (redacción/PII).
 - **DB**: PostgreSQL (ver esquema).
 
 ---
@@ -36,17 +36,25 @@ flowchart LR
 - Modo **GC**: **deshabilitado** (UI y API rechazan peticiones).
 - **Logs** en `feedback_ia` (tipo: hint/explicación/motivación), sin PII.
 
-### 2.2 PlannerAgent
+### 2.2 PlannerAgent / TheoryGen
 
 - Usa **pretest**, errores por dominio y telemetría (`eventos`) para planificar **siguientes ejercicios** (dificultad adaptativa).
 - Entrega objetivos de sesión (p. ej., “≥3 sesiones/semana”).
+- Genera módulos de teoría personalizados a través del microservicio FastAPI + Gemini (`/study/theory/generate`).
+- El backend controla condiciones de carrera (`P2002`) y reutiliza módulos recientes; si la IA no responde, existe un fallback local claramente identificado en logs.
 
-### 2.3 AssessmentAgent
+### 2.3 PracticeGen Agent (nuevo)
+
+- `/activities/exercise` y `/activities/exercise/submit` ahora generan ítems on-demand con LLM (Gemini u OpenAI según `AI_PROVIDER`).
+- Prompt maestro produce JSON con feedback inmediato (`explain_correct`, `explain_incorrect`). Se valida y persiste en `PracticeGenerated` y `PracticeAttempt` para trazabilidad y reutilización.
+- Si la IA falla o la clave no está disponible, se usa banco `practice_v1` como fallback y se loguea el evento.
+
+### 2.4 AssessmentAgent
 
 - Pre/Post **sin IA**. Ítems de **banco** versionado; cronómetro; anti-copy.
 - Guarda **respuestas por ítem** para psicometría (α, dificultad, discriminación).
 
-### 2.4 ExportAgent
+### 2.5 ExportAgent
 
 - Construye vista consolidada (**una fila por usuario**) para ANCOVA/moderación/dosis-respuesta.
 
@@ -179,6 +187,31 @@ CREATE TABLE feature_flags (
   id_usuario UUID REFERENCES usuarios(id_usuario),
   chatbot BOOLEAN DEFAULT false,
   adaptativo BOOLEAN DEFAULT false
+);
+
+-- Items generados por IA (práctica)
+CREATE TABLE practice_generated (
+  practice_generated_id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL,
+  topic TEXT,
+  difficulty TEXT,
+  item_json JSONB NOT NULL,
+  status TEXT DEFAULT 'generated',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  consumed_at TIMESTAMPTZ
+);
+
+CREATE TABLE practice_attempt (
+  practice_attempt_id SERIAL PRIMARY KEY,
+  practice_generated_id INT REFERENCES practice_generated(practice_generated_id) ON DELETE CASCADE,
+  user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
+  user_answer TEXT,
+  correct BOOLEAN,
+  explanation TEXT,
+  domain TEXT,
+  competency TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
