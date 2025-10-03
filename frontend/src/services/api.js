@@ -110,6 +110,10 @@ export const exportData = (dataType) => {
   return apiClient.get(`/admin/export?type=${dataType}`, { responseType: 'blob' });
 };
 
+export const fetchAncovaDataset = (params = {}) => {
+  return apiClient.get('/admin/exports/ancova-dataset', { params });
+};
+
 export const updatePassword = (passwordData) => {
   return apiClient.put('/users/password', passwordData);
 };

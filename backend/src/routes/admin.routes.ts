@@ -5,6 +5,7 @@ import {
   getActivitiesController as getAllActivitiesController,
   getAssessmentsController as getAllAssessmentsController,
   exportDataController,
+  exportAncovaDatasetController,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -17,5 +18,6 @@ router.get('/users', getUsersController);
 router.get('/activities', getAllActivitiesController);
 router.get('/assessments', getAllAssessmentsController);
 router.get('/export', exportDataController);
+router.get('/exports/ancova-dataset', exportAncovaDatasetController);
 
 export default router;

@@ -89,14 +89,15 @@ model Assessment {
 }
 
 model Survey {
-  survey_id         Int      @id @default(autoincrement())
+  survey_id         Int              @id @default(autoincrement())
   user_id           Int
-  perceived_utility Int?     @db.SmallInt
-  ease_of_use       Int?     @db.SmallInt
-  motivation        Int?     @db.SmallInt
-  autonomy          Int?     @db.SmallInt
-  comments          String?  @db.Text
-  created_at        DateTime @default(now())
+  perceived_utility Int?             @db.SmallInt
+  ease_of_use       Int?             @db.SmallInt
+  motivation        Int?             @db.SmallInt
+  autonomy          Int?             @db.SmallInt
+  comments          String?          @db.Text
+  timepoint         SurveyTimepoint?
+  created_at        DateTime         @default(now())
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
@@ -214,6 +215,8 @@ model SurveySubmission {
   user_id              Int
   instrument           SurveyInstrument
   version              String           @db.VarChar(50)
+  timepoint            SurveyTimepoint  @default(exit)
+  completed            Boolean          @default(true)
   submitted_at         DateTime         @default(now())
 
   user      User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
@@ -346,6 +349,13 @@ enum SurveyInstrument {
   autonomia
   tam
   satisfaccion
+}
+
+enum SurveyTimepoint {
+  pre
+  post
+  exit
+  follow_up
 }
 
 enum EventType {

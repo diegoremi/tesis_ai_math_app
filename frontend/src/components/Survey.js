@@ -79,6 +79,7 @@ const Survey = () => {
       await submitSurvey({
         instrument: 'satisfaccion',
         version: 'v1',
+        timepoint: 'exit',
         responses: items.map((item) => {
           const key = item.survey_item_id ?? item.id;
           return {

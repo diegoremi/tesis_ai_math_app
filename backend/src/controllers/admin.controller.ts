@@ -1,9 +1,77 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type SurveySubmission, type SurveyResponse, type SurveyItem } from '@prisma/client';
 import { Parser } from 'json2csv';
 
 const prisma = new PrismaClient();
+
+const EDUCATION_LEVEL_MAP: Record<string, string> = {
+  high_school: 'secundaria',
+  university: 'universitaria',
+  other: 'otro',
+};
+
+const average = (values: number[], decimals = 2) => {
+  if (!values.length) {
+    return null;
+  }
+  const raw = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Number(raw.toFixed(decimals));
+};
+
+const numericResponses = (submission: SurveySubmission & { responses: (SurveyResponse & { item: SurveyItem | null })[] }) => {
+  return submission.responses
+    .map((response) => Number(response.value ?? Number.NaN))
+    .filter((value) => Number.isFinite(value));
+};
+
+const averageBySubscale = (
+  submission: SurveySubmission & { responses: (SurveyResponse & { item: SurveyItem | null })[] },
+  subscale: string,
+) => {
+  const values = submission.responses
+    .filter((response) => response.item?.subscale === subscale)
+    .map((response) => Number(response.value ?? Number.NaN))
+    .filter((value) => Number.isFinite(value));
+  return average(values);
+};
+
+const findSubmission = (
+  submissions: (SurveySubmission & { responses: (SurveyResponse & { item: SurveyItem | null })[] })[],
+  instrument: string,
+  timepoint?: string,
+) => {
+  const filtered = submissions.filter((submission) => {
+    if (submission.instrument !== instrument) return false;
+    if (timepoint && submission.timepoint !== timepoint) return false;
+    return true;
+  });
+  if (!filtered.length) {
+    return null;
+  }
+  filtered.sort((a, b) => b.submitted_at.getTime() - a.submitted_at.getTime());
+  return filtered[0] ?? null;
+};
+
+const sumFromMetadata = (events: { metadata: unknown }[], keys: string[]) => {
+  return events.reduce((total, event) => {
+    if (!event.metadata || typeof event.metadata !== 'object') {
+      return total;
+    }
+    const candidate = keys
+      .map((key) => {
+        if (key in (event.metadata as Record<string, unknown>)) {
+          return Number((event.metadata as Record<string, unknown>)[key] as number | string);
+        }
+        return Number.NaN;
+      })
+      .find((value) => Number.isFinite(value));
+    if (candidate !== undefined && Number.isFinite(candidate)) {
+      return total + Number(candidate);
+    }
+    return total;
+  }, 0);
+};
 
 export const getUsersController = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -38,6 +106,7 @@ export const getAssessmentsController = async (req: AuthenticatedRequest, res: R
 export const exportDataController = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataType = req.query.type as string;
+    const outputFormat = (req.query.format as string | undefined)?.toLowerCase();
     let data: any[] = [];
     let fields: string[] = [];
     let filename = 'export.csv';
@@ -60,11 +129,32 @@ export const exportDataController = async (req: AuthenticatedRequest, res: Respo
         break;
       case 'ancova':
         data = await buildAncovaDataset();
-        fields = ['participant_code', 'grupo', 'pretest', 'postest', 'tam_utilidad', 'tam_facilidad', 'edad', 'education_level'];
+        fields = [
+          'id_usuario',
+          'grupo',
+          'pretest',
+          'postest',
+          'tam_utilidad',
+          'tam_facilidad',
+          'mot_pre',
+          'mot_post',
+          'auto_pre',
+          'auto_post',
+          'sesiones_semana',
+          'minutos_totales',
+          'ejercicios_resueltos',
+          'porc_aciertos',
+          'edad',
+          'nivel_estudio',
+        ];
         filename = 'ancova_dataset.csv';
         break;
       default:
         return res.status(400).json({ message: 'Invalid data type for export' });
+    }
+
+    if (dataType === 'ancova' && outputFormat === 'json') {
+      return res.status(200).json({ rows: data, generatedAt: new Date().toISOString() });
     }
 
     const json2csvParser = new Parser({ fields });
@@ -80,6 +170,16 @@ export const exportDataController = async (req: AuthenticatedRequest, res: Respo
   }
 };
 
+export const exportAncovaDatasetController = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const dataset = await buildAncovaDataset();
+    res.status(200).json({ rows: dataset, generatedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error building ANCOVA dataset', error);
+    res.status(500).json({ message: 'Error building ANCOVA dataset' });
+  }
+};
+
 const buildAncovaDataset = async () => {
   const participants = await prisma.user.findMany({
     include: {
@@ -89,9 +189,6 @@ const buildAncovaDataset = async () => {
       },
       assessments: true,
       surveySubmissions: {
-        where: { instrument: 'tam' },
-        orderBy: { submitted_at: 'desc' },
-        take: 1,
         include: {
           responses: {
             include: {
@@ -100,41 +197,86 @@ const buildAncovaDataset = async () => {
           },
         },
       },
+      activities: {
+        where: { activity_type: 'exercise' },
+      },
+      events: true,
     },
   });
 
-  return participants.map(participant => {
-    const assignment = participant.assignments[0];
-    const pretest = participant.assessments.find(assessment => assessment.assessment_type === 'pretest');
-    const postest = participant.assessments.find(assessment => assessment.assessment_type === 'posttest');
-    const tamSubmission = participant.surveySubmissions[0];
+  return participants
+    .map((participant) => {
+      const assignment = participant.assignments[0];
+      const pretest = participant.assessments.find((assessment) => assessment.assessment_type === 'pretest');
+      const postest = participant.assessments.find((assessment) => assessment.assessment_type === 'posttest');
 
-    const tamScores = { utilidad: null as number | null, facilidad: null as number | null };
+      if (!postest || postest.total_score == null) {
+        return null;
+      }
 
-    if (tamSubmission) {
-      const utilidadResponses = tamSubmission.responses.filter(response => response.item?.subscale === 'utilidad');
-      const facilidadResponses = tamSubmission.responses.filter(response => response.item?.subscale === 'facilidad');
+      const tamSubmission = findSubmission(participant.surveySubmissions, 'tam', 'exit')
+        ?? findSubmission(participant.surveySubmissions, 'tam');
+      const motivationPre = findSubmission(participant.surveySubmissions, 'motivacion', 'pre');
+      const motivationPost = findSubmission(participant.surveySubmissions, 'motivacion', 'post')
+        ?? findSubmission(participant.surveySubmissions, 'motivacion', 'exit');
+      const autonomyPre = findSubmission(participant.surveySubmissions, 'autonomia', 'pre');
+      const autonomyPost = findSubmission(participant.surveySubmissions, 'autonomia', 'post')
+        ?? findSubmission(participant.surveySubmissions, 'autonomia', 'exit');
 
-      const utilidadAverage = utilidadResponses.length
-        ? utilidadResponses.reduce((sum, response) => sum + (response.value ?? 0), 0) / utilidadResponses.length
-        : null;
-      const facilidadAverage = facilidadResponses.length
-        ? facilidadResponses.reduce((sum, response) => sum + (response.value ?? 0), 0) / facilidadResponses.length
-        : null;
+      const tamUtilidad = tamSubmission ? averageBySubscale(tamSubmission, 'utilidad') : null;
+      const tamFacilidad = tamSubmission ? averageBySubscale(tamSubmission, 'facilidad') : null;
+      const motPre = motivationPre ? average(numericResponses(motivationPre)) : null;
+      const motPost = motivationPost ? average(numericResponses(motivationPost)) : null;
+      const autoPre = autonomyPre ? average(numericResponses(autonomyPre)) : null;
+      const autoPost = autonomyPost ? average(numericResponses(autonomyPost)) : null;
 
-      tamScores.utilidad = utilidadAverage;
-      tamScores.facilidad = facilidadAverage;
-    }
+      const totalCorrect = participant.activities.reduce((sum, activity) => sum + (activity.correct_answers ?? 0), 0);
+      const totalAttempts = participant.activities.reduce((sum, activity) => sum + (activity.attempts ?? 0), 0);
+      const exercisesSolved = totalCorrect;
+      const accuracy = totalAttempts > 0 ? Number((totalCorrect / totalAttempts).toFixed(2)) : null;
 
-    return {
-      participant_code: participant.participant_code,
-      grupo: assignment?.group ?? null,
-      pretest: pretest?.total_score ?? null,
-      postest: postest?.total_score ?? null,
-      tam_utilidad: tamScores.utilidad,
-      tam_facilidad: tamScores.facilidad,
-      edad: participant.age,
-      education_level: participant.education_level,
-    };
-  });
+      const sessionEvents = participant.events.filter((event) => event.event_type === 'session_start');
+      let sessionsPerWeek = 0;
+      if (sessionEvents.length > 0) {
+        const sortedSessions = [...sessionEvents].sort(
+          (a, b) => a.occurred_at.getTime() - b.occurred_at.getTime(),
+        );
+        const first = sortedSessions[0]!.occurred_at;
+        const last = sortedSessions[sortedSessions.length - 1]!.occurred_at;
+        const activeDays = Math.max(1, (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24));
+        const weeks = Math.max(1, activeDays / 7);
+        sessionsPerWeek = Number((sessionEvents.length / weeks).toFixed(2));
+      }
+
+      const totalDurationSeconds = sumFromMetadata(participant.events, [
+        'duracion_seg',
+        'duration_seg',
+        'duration_seconds',
+        'duracionSeg',
+        'duration',
+      ]);
+      const totalMinutes = Number((totalDurationSeconds / 60).toFixed(0));
+
+      return {
+        id_usuario: participant.participant_code,
+        grupo: assignment?.group ?? null,
+        pretest: pretest?.total_score ?? null,
+        postest: postest?.total_score ?? null,
+        tam_utilidad: tamUtilidad,
+        tam_facilidad: tamFacilidad,
+        mot_pre: motPre,
+        mot_post: motPost,
+        auto_pre: autoPre,
+        auto_post: autoPost,
+        sesiones_semana: sessionsPerWeek,
+        minutos_totales: totalMinutes,
+        ejercicios_resueltos: exercisesSolved,
+        porc_aciertos: accuracy,
+        edad: participant.age ?? null,
+        nivel_estudio: participant.education_level
+          ? EDUCATION_LEVEL_MAP[participant.education_level] ?? participant.education_level
+          : null,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
 };

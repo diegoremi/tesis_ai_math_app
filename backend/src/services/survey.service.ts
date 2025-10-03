@@ -1,4 +1,4 @@
-import { PrismaClient, SurveyInstrument } from '@prisma/client';
+import { PrismaClient, SurveyInstrument, SurveyTimepoint } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -20,10 +20,20 @@ interface SurveySubmissionPayload {
   responses: SurveyResponseInput[];
   comments?: string;
   aggregates?: AggregatedScores;
+  timepoint?: SurveyTimepoint | string;
+  completed?: boolean;
 }
 
 export const createSurvey = async (userId: number, surveyData: SurveySubmissionPayload) => {
-  const { instrument, version = 'v1', responses, comments, aggregates } = surveyData;
+  const {
+    instrument,
+    version = 'v1',
+    responses,
+    comments,
+    aggregates,
+    timepoint = 'exit',
+    completed = true,
+  } = surveyData;
 
   if (!responses || responses.length === 0) {
     throw new Error('At least one response is required');
@@ -34,6 +44,8 @@ export const createSurvey = async (userId: number, surveyData: SurveySubmissionP
       user_id: userId,
       instrument: instrument as SurveyInstrument,
       version,
+      timepoint: timepoint as SurveyTimepoint,
+      completed,
       responses: {
         create: responses.map(response => ({
           survey_item_id: response.survey_item_id,
@@ -64,6 +76,7 @@ export const createSurvey = async (userId: number, surveyData: SurveySubmissionP
         ease_of_use: aggregates?.ease_of_use ?? null,
         motivation: aggregates?.motivation ?? null,
         autonomy: aggregates?.autonomy ?? null,
+        timepoint: timepoint as SurveyTimepoint,
       },
     });
   }

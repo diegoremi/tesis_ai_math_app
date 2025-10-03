@@ -1,6 +1,7 @@
 
 import os
 import json
+import re
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -30,6 +31,20 @@ class HintRequest(BaseModel):
 def has_gemini_key() -> bool:
     return bool(API_KEY)
 
+
+PII_PATTERNS = [
+    r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+    r"\+?\d[\d\-\s]{7,}",
+    r"(?i)(calle|direccion|address)\s+[\w\s]+\d{1,4}",
+]
+
+
+def redact(text: str) -> str:
+    redacted = text
+    for pattern in PII_PATTERNS:
+        redacted = re.sub(pattern, "[REDACTED]", redacted)
+    return redacted
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -47,7 +62,7 @@ def chat(chat_message: ChatMessage):
                 "Provide concise explanations, actionable hints, and motivation."
             ),
         )
-        response = model.generate_content(chat_message.message)
+        response = model.generate_content(redact(chat_message.message))
         return {"response": response.text}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
@@ -93,7 +108,7 @@ def generate_hint(request: HintRequest):
     prompt = (
         "Provide a succinct hint (not the full solution) to help a student solve the following math problem. "
         "The hint should encourage the next step without revealing the answer.\n"
-        f"Problem: {request.stem}\n"
+        f"Problem: {redact(request.stem)}\n"
         f"{option_text}\n"
         f"{domain_text}{competency_text}\n"
         "Hint:"

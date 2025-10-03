@@ -45,7 +45,11 @@ const Exercises = () => {
       setHint(response.data.hint);
     } catch (err) {
       console.error(err);
-      setHint("No pudimos obtener una pista en este momento.");
+      if (err?.response?.status === 403) {
+        setHint('Las pistas con IA no están habilitadas para tu cohorte.');
+      } else {
+        setHint('No pudimos obtener una pista en este momento.');
+      }
     }
   };
 
