@@ -82,6 +82,10 @@ export const fetchFeatureFlags = () => {
   return apiClient.get('/study/feature-flags');
 };
 
+export const getRandomizationSummary = () => {
+  return apiClient.get('/study/randomize/summary');
+};
+
 export const logEvent = (eventPayload) => {
   return apiClient.post('/events', eventPayload);
 };

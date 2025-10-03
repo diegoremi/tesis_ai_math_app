@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../../services/api';
+import { useAuth } from 'context/AuthContext';
 
 const IntroductoryTest = () => {
   const navigate = useNavigate();
+  const { refreshAssessmentStatus } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [items, setItems] = useState([]);
@@ -17,12 +19,13 @@ const IntroductoryTest = () => {
       setLoading(true);
       try {
         const response = await getAssessmentItems({ type: 'pretest' });
-        setItems(response.data.items ?? []);
+        const fetched = response.data.items ?? [];
+        setItems(fetched);
         setAnswers({});
         setStep(0);
       } catch (err) {
         console.error('Error fetching pretest items:', err);
-        setError('Unable to load assessment items. Please try again later.');
+        setError('No pudimos cargar las preguntas del pretest. Intenta nuevamente.');
       } finally {
         setLoading(false);
       }
@@ -79,10 +82,11 @@ const IntroductoryTest = () => {
         })),
       });
 
+      await refreshAssessmentStatus();
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to submit pretest:', err);
-      setError('We could not submit your responses. Please try again.');
+      setError('No pudimos guardar tus respuestas. Intenta nuevamente.');
     } finally {
       setSubmitting(false);
     }
@@ -91,7 +95,7 @@ const IntroductoryTest = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">Loading assessment…</p>
+        <p className="text-sm text-gray-400">Cargando pretest…</p>
       </div>
     );
   }
@@ -103,16 +107,16 @@ const IntroductoryTest = () => {
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-emerald-500/10 text-emerald-400 mb-4">
             <span className="material-symbols-outlined text-3xl">task_alt</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Introductory test completed</h1>
+          <h1 className="text-3xl font-bold tracking-tight">¡Pretest completado!</h1>
           <p className="mt-4 text-base text-gray-400">
-            Gracias por completar el pretest. Guardamos tus respuestas para personalizar tu experiencia.
+            Guardamos tus resultados. Ahora las prácticas y recomendaciones se adaptarán a tu nivel.
           </p>
           <button
             type="button"
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition"
-            onClick={() => navigate('/exercises')}
+            onClick={() => navigate('/dashboard', { replace: true })}
           >
-            Go to practice
+            Ir al panel
             <span className="material-symbols-outlined text-base">arrow_forward</span>
           </button>
         </div>
@@ -123,7 +127,7 @@ const IntroductoryTest = () => {
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">No assessment items available.</p>
+        <p className="text-sm text-gray-400">No hay preguntas disponibles en este momento.</p>
       </div>
     );
   }
@@ -134,25 +138,23 @@ const IntroductoryTest = () => {
         <div className="flex items-center gap-3 text-white">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">AI</span>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Assessment</p>
-            <h1 className="text-xl font-semibold">Introductory Test</h1>
+            <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Evaluación inicial</p>
+            <h1 className="text-xl font-semibold">Pretest diagnóstico</h1>
           </div>
         </div>
-        <span className="text-sm text-gray-400">Time remaining: 60 min</span>
+        <span className="text-sm text-gray-400">Tiempo sugerido: 15 min</span>
       </header>
 
       <main className="px-6 py-12 flex justify-center">
         <div className="w-full max-w-2xl bg-gray-900/60 rounded-2xl border border-gray-800 shadow-2xl p-8 space-y-8">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight text-white">Math Assessment</h2>
-            <p className="text-sm text-gray-400">
-              Question {step + 1} of {items.length}
-            </p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">Pregunta {step + 1} de {items.length}</h2>
+            <p className="text-sm text-gray-400">Responde sin ayuda externa. Esto nos ayuda a personalizar el plan.</p>
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300 font-medium">Progress</span>
+              <span className="text-gray-300 font-medium">Progreso</span>
               <span className="text-emerald-400 font-semibold">{progress}%</span>
             </div>
             <div className="h-2 w-full rounded-full bg-gray-700 overflow-hidden">
@@ -194,7 +196,7 @@ const IntroductoryTest = () => {
               className="flex items-center justify-center gap-2 rounded-full border border-gray-700 px-6 py-2 text-sm font-semibold text-gray-200 disabled:opacity-40"
             >
               <span className="material-symbols-outlined text-base">arrow_back</span>
-              Previous
+              Anterior
             </button>
             {step < items.length - 1 ? (
               <button
@@ -203,7 +205,7 @@ const IntroductoryTest = () => {
                 disabled={submitting}
                 className="flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition disabled:opacity-70"
               >
-                Next
+                Siguiente
                 <span className="material-symbols-outlined text-base">arrow_forward</span>
               </button>
             ) : (
@@ -213,7 +215,7 @@ const IntroductoryTest = () => {
                 disabled={submitting}
                 className="flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition disabled:opacity-70"
               >
-                {submitting ? 'Submitting…' : 'Submit Assessment'}
+                {submitting ? 'Enviando…' : 'Finalizar pretest'}
                 <span className="material-symbols-outlined text-base">check</span>
               </button>
             )}

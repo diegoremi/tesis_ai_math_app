@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../../services/api';
+import { useAuth } from 'context/AuthContext';
 
 const ExitTest = () => {
   const navigate = useNavigate();
+  const { refreshAssessmentStatus } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [items, setItems] = useState([]);
@@ -17,12 +19,13 @@ const ExitTest = () => {
       setLoading(true);
       try {
         const response = await getAssessmentItems({ type: 'posttest', version: 'exit_v1' });
-        setItems(response.data.items ?? []);
+        const fetched = response.data.items ?? [];
+        setItems(fetched);
         setAnswers({});
         setStep(0);
       } catch (err) {
         console.error('Error fetching exit test items:', err);
-        setError('Unable to load exit test items.');
+        setError('No pudimos cargar las preguntas del exit test. Intenta nuevamente.');
       } finally {
         setLoading(false);
       }
@@ -32,6 +35,7 @@ const ExitTest = () => {
 
   const currentQuestion = items[step];
   const optionList = Array.isArray(currentQuestion?.options) ? currentQuestion.options : [];
+
   const progress = useMemo(() => {
     if (items.length === 0) return 0;
     return Math.round(((step + 1) / items.length) * 100);
@@ -60,13 +64,14 @@ const ExitTest = () => {
     try {
       const responses = items.map((item) => {
         const answer = answers[item.item_id] ?? null;
+        const isCorrect =
+          answer !== null
+            ? String(answer).trim().toLowerCase() === item.correct_key.toLowerCase()
+            : null;
         return {
           item_id: item.item_id,
           answer,
-          is_correct:
-            answer !== null
-              ? String(answer).trim().toLowerCase() === item.correct_key.toLowerCase()
-              : null,
+          is_correct: isCorrect,
         };
       });
 
@@ -78,10 +83,12 @@ const ExitTest = () => {
         total_score: totalCorrect,
         responses,
       });
+
+      await refreshAssessmentStatus();
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to submit exit test:', err);
-      setError('Could not submit the exit test. Please retry.');
+      setError('No pudimos guardar tus respuestas. Intenta nuevamente.');
     } finally {
       setSubmitting(false);
     }
@@ -90,7 +97,7 @@ const ExitTest = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">Loading exit test…</p>
+        <p className="text-sm text-gray-400">Cargando exit test…</p>
       </div>
     );
   }
@@ -102,16 +109,16 @@ const ExitTest = () => {
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-sky-500/10 text-sky-400 mb-4">
             <span className="material-symbols-outlined text-3xl">celebration</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Exit test complete</h1>
+          <h1 className="text-3xl font-bold tracking-tight">¡Completaste el exit test!</h1>
           <p className="mt-4 text-base text-gray-400">
-            Excelente trabajo. Guardamos tus resultados y liberaremos tu reporte de progreso.
+            Gracias por compartir tu progreso. Libera tus reportes desde el panel y revisa las recomendaciones finales.
           </p>
           <button
             type="button"
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-3 text-sm font-semibold text-gray-950 hover:bg-sky-400 transition"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/dashboard', { replace: true })}
           >
-            Back to dashboard
+            Volver al panel
             <span className="material-symbols-outlined text-base">arrow_forward</span>
           </button>
         </div>
@@ -122,7 +129,7 @@ const ExitTest = () => {
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">Exit test items not available.</p>
+        <p className="text-sm text-gray-400">No hay preguntas disponibles en este momento.</p>
       </div>
     );
   }
@@ -133,25 +140,23 @@ const ExitTest = () => {
         <div className="flex items-center gap-3 text-white">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-sky-400 font-semibold">AI</span>
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Assessment</p>
-            <h1 className="text-xl font-semibold">Exit Test</h1>
+            <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Evaluación final</p>
+            <h1 className="text-xl font-semibold">Exit test</h1>
           </div>
         </div>
-        <span className="text-sm text-gray-400">Time remaining: 45 min</span>
+        <span className="text-sm text-gray-400">Tiempo sugerido: 15 min</span>
       </header>
 
       <main className="px-6 py-12 flex justify-center">
         <div className="w-full max-w-2xl bg-gray-900/60 rounded-2xl border border-gray-800 shadow-2xl p-8 space-y-8">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight text-white">Final Assessment</h2>
-            <p className="text-sm text-gray-400">
-              Question {step + 1} of {items.length}
-            </p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">Pregunta {step + 1} de {items.length}</h2>
+            <p className="text-sm text-gray-400">Demuestra cuánto avanzaste. Confía en tu proceso.</p>
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300 font-medium">Progress</span>
+              <span className="text-gray-300 font-medium">Progreso</span>
               <span className="text-sky-400 font-semibold">{progress}%</span>
             </div>
             <div className="h-2 w-full rounded-full bg-gray-700 overflow-hidden">
@@ -193,7 +198,7 @@ const ExitTest = () => {
               className="flex items-center justify-center gap-2 rounded-full border border-gray-700 px-6 py-2 text-sm font-semibold text-gray-200 disabled:opacity-40"
             >
               <span className="material-symbols-outlined text-base">arrow_back</span>
-              Previous
+              Anterior
             </button>
             {step < items.length - 1 ? (
               <button
@@ -202,7 +207,7 @@ const ExitTest = () => {
                 disabled={submitting}
                 className="flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-sky-400 transition disabled:opacity-70"
               >
-                Next
+                Siguiente
                 <span className="material-symbols-outlined text-base">arrow_forward</span>
               </button>
             ) : (
@@ -212,7 +217,7 @@ const ExitTest = () => {
                 disabled={submitting}
                 className="flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-sky-400 transition disabled:opacity-70"
               >
-                {submitting ? 'Submitting…' : 'Submit Assessment'}
+                {submitting ? 'Enviando…' : 'Finalizar exit test'}
                 <span className="material-symbols-outlined text-base">check</span>
               </button>
             )}

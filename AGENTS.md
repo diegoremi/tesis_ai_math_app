@@ -234,6 +234,7 @@ LEFT JOIN vw_tam_scores t ON t.id_usuario=u.id_usuario;
 POST   /auth/register
 POST   /study/consent               # body: {documentVersion, accepted}
 POST   /study/randomize             # admin-only; asigna GE/GC y feature flags
+GET    /study/randomize/summary     # admin-only; muestra asignados vs pendientes
 GET    /study/feature-flags         # devuelve flags + grupo asignado
 
 GET    /evaluations/items?type=pretest|posttest  # banco versionado (sin IA)
@@ -338,6 +339,7 @@ FEATURE_FLAGS_DEFAULT=false
 ## 9) Reglas de UI (gating y evaluación)
 
 - **Assessments (pre/post)**: sin chatbot, sin hints, no copy/paste, timer visible.
+- **Pretest obligatorio tras login**: redirigir a `/study/pretest` hasta completar; luego habilitar resto de vistas.
 - **GE vs GC**: condicional de botones/acciones por `feature_flags`.
 - **Daily Learning**: barra de **adherencia** y meta ≥3 sesiones/semana.
 - **Progress Report**: mostrar “dosis” (minutos, ejercicios, aciertos, streaks) y recomendaciones.

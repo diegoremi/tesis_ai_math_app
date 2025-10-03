@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { recordConsent, randomizeParticipants, getFeatureFlagsForUser } from '../services/study.service.js';
+import { recordConsent, randomizeParticipants, getFeatureFlagsForUser, getRandomizationSummary } from '../services/study.service.js';
 
 export const submitConsentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -39,5 +39,15 @@ export const getFeatureFlagsController = async (req: AuthenticatedRequest, res: 
   } catch (error) {
     console.error('getFeatureFlagsController', error);
     res.status(500).json({ message: 'Error retrieving feature flags' });
+  }
+};
+
+export const getRandomizationSummaryController = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await getRandomizationSummary();
+    res.status(200).json(summary);
+  } catch (error) {
+    console.error('getRandomizationSummaryController', error);
+    res.status(500).json({ message: 'Error fetching randomization summary' });
   }
 };

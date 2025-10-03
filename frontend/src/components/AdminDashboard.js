@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
-import { getUsers, getAdminActivities, getAdminAssessments, exportData } from '../services/api';
+import {
+  getUsers,
+  getAdminActivities,
+  getAdminAssessments,
+  exportData,
+  randomizeParticipants,
+  getRandomizationSummary,
+} from '../services/api';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -12,23 +19,44 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [activities, setActivities] = useState([]);
   const [assessments, setAssessments] = useState([]);
+  const [randomizationSummary, setRandomizationSummary] = useState(null);
+  const [randomizeSeed, setRandomizeSeed] = useState('');
+  const [randomizeMethod, setRandomizeMethod] = useState('azar');
+  const [randomizeLoading, setRandomizeLoading] = useState(false);
+  const [randomizeMessage, setRandomizeMessage] = useState(null);
+  const [randomizeError, setRandomizeError] = useState(null);
+
+  const fetchRandomizationSummary = useCallback(async () => {
+    if (!user || user.role !== 'admin') {
+      setRandomizationSummary(null);
+      return;
+    }
+    try {
+      const response = await getRandomizationSummary();
+      setRandomizationSummary(response.data);
+      setRandomizeError(null);
+    } catch (err) {
+      console.error('Error fetching randomization summary:', err);
+      setRandomizeError('Failed to load randomization summary.');
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!isAuthenticated || (user && (user.role !== 'admin' && user.role !== 'facilitator'))) {
+      if (!isAuthenticated || !user || (user.role !== 'admin' && user.role !== 'facilitator')) {
         navigate('/');
         return;
       }
       try {
-        const usersResponse = await getUsers();
+        const [usersResponse, activitiesResponse, assessmentsResponse] = await Promise.all([
+          getUsers(),
+          getAdminActivities(),
+          getAdminAssessments(),
+        ]);
         setUsers(usersResponse.data);
-
-        const activitiesResponse = await getAdminActivities();
         setActivities(activitiesResponse.data);
-
-        const assessmentsResponse = await getAdminAssessments();
         setAssessments(assessmentsResponse.data);
-
+        await fetchRandomizationSummary();
       } catch (err) {
         setError('Failed to fetch admin data');
         console.error(err);
@@ -41,7 +69,7 @@ const AdminDashboard = () => {
     };
 
     fetchData();
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, fetchRandomizationSummary]);
 
   const handleExport = async (dataType) => {
     try {
@@ -59,6 +87,32 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleRandomize = async (event) => {
+    event.preventDefault();
+    setRandomizeLoading(true);
+    setRandomizeMessage(null);
+    setRandomizeError(null);
+    try {
+      const payload = { method: randomizeMethod };
+      if (randomizeSeed.trim()) {
+        payload.seed = randomizeSeed.trim();
+      }
+      const response = await randomizeParticipants(payload);
+      const { assigned, groups } = response.data;
+      setRandomizeMessage(
+        `Se asignaron ${assigned} participantes (GE: ${groups?.GE ?? 0}, GC: ${groups?.GC ?? 0}).`
+      );
+      await fetchRandomizationSummary();
+      await getUsers().then((res) => setUsers(res.data));
+    } catch (err) {
+      console.error('Error randomizing participants:', err);
+      const message = err?.response?.data?.message ?? 'No pudimos asignar los grupos.';
+      setRandomizeError(message);
+    } finally {
+      setRandomizeLoading(false);
+    }
+  };
+
   if (loading) {
     return <div>Loading Admin Dashboard...</div>;
   }
@@ -69,16 +123,16 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard-container">
-      <h2>Admin/Facilitator Dashboard</h2>
+      <h2>Panel de administración</h2>
       <div className="admin-dashboard-section">
-        <h3>User Management</h3>
+        <h3>Personas registradas</h3>
         <table>
           <thead>
             <tr>
               <th>ID</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
+              <th>Nombre</th>
+              <th>Correo</th>
+              <th>Rol</th>
             </tr>
           </thead>
           <tbody>
@@ -95,16 +149,16 @@ const AdminDashboard = () => {
       </div>
 
       <div className="admin-dashboard-section">
-        <h3>Activities Data</h3>
+        <h3>Actividades</h3>
         <table>
           <thead>
             <tr>
               <th>ID</th>
-              <th>User ID</th>
-              <th>Type</th>
-              <th>Difficulty</th>
-              <th>Attempts</th>
-              <th>Correct</th>
+              <th>ID usuario</th>
+              <th>Tipo</th>
+              <th>Dificultad</th>
+              <th>Intentos</th>
+              <th>Aciertos</th>
             </tr>
           </thead>
           <tbody>
@@ -123,14 +177,14 @@ const AdminDashboard = () => {
       </div>
 
       <div className="admin-dashboard-section">
-        <h3>Assessments Data</h3>
+        <h3>Evaluaciones</h3>
         <table>
           <thead>
             <tr>
               <th>ID</th>
-              <th>User ID</th>
-              <th>Type</th>
-              <th>Score</th>
+              <th>ID usuario</th>
+              <th>Tipo</th>
+              <th>Puntaje</th>
             </tr>
           </thead>
           <tbody>
@@ -147,11 +201,59 @@ const AdminDashboard = () => {
       </div>
 
       <div className="admin-dashboard-section">
-        <h3>Data Export</h3>
-        <button onClick={() => handleExport('users')}>Export Users CSV</button>
-        <button onClick={() => handleExport('activities')}>Export Activities CSV</button>
-        <button onClick={() => handleExport('assessments')}>Export Assessments CSV</button>
+        <h3>Exportar datos</h3>
+        <button onClick={() => handleExport('users')}>Descargar usuarios (CSV)</button>
+        <button onClick={() => handleExport('activities')}>Descargar actividades (CSV)</button>
+        <button onClick={() => handleExport('assessments')}>Descargar evaluaciones (CSV)</button>
       </div>
+
+      {user?.role === 'admin' && (
+        <div className="admin-dashboard-section">
+          <h3>Asignación de grupos</h3>
+          {randomizationSummary ? (
+            <div className="randomization-summary">
+              <p>Participantes totales: {randomizationSummary.totalParticipants}</p>
+              <p>
+                Asignados — GE: {randomizationSummary.assigned?.GE ?? 0}, GC: {randomizationSummary.assigned?.GC ?? 0}
+              </p>
+              <p>Pendientes de asignar: {randomizationSummary.unassigned}</p>
+              {randomizationSummary.lastRun && (
+                <p>
+                  Última ejecución: {new Date(randomizationSummary.lastRun.assigned_at).toLocaleString()} (método: {randomizationSummary.lastRun.method}
+                  {randomizationSummary.lastRun.seed ? `, semilla: ${randomizationSummary.lastRun.seed}` : ''})
+                </p>
+              )}
+            </div>
+          ) : (
+        <p>Todavía no se ejecutó ninguna asignación.</p>
+          )}
+          <form className="randomization-form" onSubmit={handleRandomize}>
+            <div className="randomization-controls">
+              <label>
+                Método
+                <select value={randomizeMethod} onChange={(e) => setRandomizeMethod(e.target.value)}>
+                  <option value="azar">Azar (balance automático)</option>
+                  <option value="emparejamiento">Emparejamiento manual</option>
+                </select>
+              </label>
+              <label>
+                Semilla (opcional)
+                <input
+                  type="text"
+                  value={randomizeSeed}
+                  onChange={(e) => setRandomizeSeed(e.target.value)}
+                  placeholder="e.g. study-week-01"
+                />
+              </label>
+              <button type="submit" disabled={randomizeLoading}>
+                {randomizeLoading ? 'Asignando…' : 'Ejecutar asignación'}
+              </button>
+            </div>
+          </form>
+          {randomizeMessage && <p className="success-message">{randomizeMessage}</p>}
+          {randomizeError && <p className="error-message">{randomizeError}</p>}
+        </div>
+      )}
     </div>
   );
 };

@@ -169,3 +169,53 @@ export const getFeatureFlagsForUser = async (userId: number) => {
     assigned_at: assignment?.assigned_at ?? null,
   };
 };
+
+export const getRandomizationSummary = async () => {
+  const [totalParticipants, groupedAssignments, unassignedCount, latestAssignment] = await Promise.all([
+    prisma.user.count(),
+    prisma.assignment.groupBy({
+      by: ['group'],
+      _count: {
+        group: true,
+      },
+    }),
+    prisma.user.count({
+      where: {
+        assignments: {
+          none: {},
+        },
+      },
+    }),
+    prisma.assignment.findFirst({
+      orderBy: { assigned_at: 'desc' },
+      select: {
+        assigned_at: true,
+        method: true,
+        seed: true,
+      },
+    }),
+  ]);
+
+  const groupSummary: Record<AssignmentGroup, number> = {
+    GE: 0,
+    GC: 0,
+  };
+
+  groupedAssignments.forEach((entry) => {
+    const castedGroup = entry.group as AssignmentGroup;
+    groupSummary[castedGroup] = entry._count.group;
+  });
+
+  return {
+    totalParticipants,
+    assigned: groupSummary,
+    unassigned: unassignedCount,
+    lastRun: latestAssignment
+      ? {
+          assigned_at: latestAssignment.assigned_at,
+          method: latestAssignment.method,
+          seed: latestAssignment.seed,
+        }
+      : null,
+  };
+};

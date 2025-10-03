@@ -183,3 +183,17 @@ export const gradePracticeAnswer = async (
     accuracy,
   };
 };
+
+export const getPracticeItemById = async (itemId: number) => {
+  const item = await prisma.assessmentItem.findUnique({ where: { item_id: itemId } });
+  if (!item) {
+    return null;
+  }
+  return {
+    itemId: item.item_id,
+    stem: item.stem,
+    options: toOptions(item.options as unknown),
+    domain: item.domain ?? null,
+    competency: item.competency ?? null,
+  };
+};

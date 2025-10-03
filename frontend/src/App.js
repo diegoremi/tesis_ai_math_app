@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import Login from './components/auth/Login';
 import Dashboard from './components/Dashboard';
@@ -14,15 +14,20 @@ import ExitTest from './components/study/ExitTest';
 import './App.css';
 
 // Simple ProtectedRoute component
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth(); // Use isAuthenticated from context
+const ProtectedRoute = ({ children, skipPretestCheck = false }) => {
+  const { isAuthenticated, loading, assessmentStatus } = useAuth();
+  const location = useLocation();
 
-  if (loading) {
-    return <div>Loading authentication...</div>; // Or a spinner
+  if (loading || !assessmentStatus.loaded) {
+    return <div>Cargando autenticación...</div>;
   }
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />; // Redirect to login if not authenticated
+  }
+  const onPretestPage = location.pathname.startsWith('/study/pretest');
+  if (!skipPretestCheck && !assessmentStatus.pretestCompleted && !onPretestPage) {
+    return <Navigate to="/study/pretest" replace />;
   }
   return children;
 };
@@ -46,7 +51,7 @@ function App() {
           <Route
             path="/study/consent"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute skipPretestCheck>
                 <Consent />
               </ProtectedRoute>
             }
@@ -54,7 +59,7 @@ function App() {
           <Route
             path="/study/pretest"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute skipPretestCheck>
                 <IntroductoryTest />
               </ProtectedRoute>
             }

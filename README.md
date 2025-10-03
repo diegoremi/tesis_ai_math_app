@@ -27,6 +27,7 @@ Refer to `AGENTS.md` for agent behaviours, end-to-end protocol, and sprint roadm
 cd backend
 npm install
 cp .env.example .env   # create and edit with DATABASE_URL, JWT_SECRET, OPENAI keys, etc.
+npx prisma format
 npx prisma migrate deploy
 npx prisma db seed     # populates assessment + survey item banks
 npm run dev            # nodemon + tsx on port 8080
@@ -37,6 +38,7 @@ Key env vars:
 - `JWT_SECRET`
 - `OPENAI_API_KEY` / `GEMINI_API_KEY`
 - `PII_REDACTION`, feature flags as needed
+- `AI_SERVICE_URL` (optional, defaults to `http://localhost:8001`)
 
 ### Frontend
 
@@ -57,7 +59,24 @@ source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # configure GEMINI/OpenAI keys
 uvicorn main:app --reload
+pytest                 # run FastAPI smoke tests (uses mocked models)
 ```
+
+### One-shot local dev
+
+Once dependencies are installed, use the helper script at the repository root:
+
+```bash
+./dev.sh
+```
+
+This starts:
+
+- FastAPI AI module on `http://localhost:8001`
+- Express backend on `http://localhost:8080`
+- React frontend on `http://localhost:3000`
+
+Press `Ctrl+C` to stop all processes. The script creates virtualenvs or copies `.env` templates as needed.
 
 ## Database Notes
 

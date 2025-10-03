@@ -1,6 +1,6 @@
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { login as apiLogin, logout as apiLogout, fetchFeatureFlags } from '../services/api';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { login as apiLogin, logout as apiLogout, fetchFeatureFlags, getAssessments } from '../services/api';
 
 // Helper function to decode JWT (basic, for demonstration)
 const decodeJwt = (token) => {
@@ -24,31 +24,70 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null); // New state for user data
   const [loading, setLoading] = useState(true);
   const [featureFlags, setFeatureFlags] = useState(null);
+  const [assessmentStatus, setAssessmentStatus] = useState({
+    pretestCompleted: false,
+    posttestCompleted: false,
+    loaded: false,
+  });
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      const decodedUser = decodeJwt(token);
-      if (decodedUser) {
-        setIsAuthenticated(true);
-        setUser(decodedUser);
-        fetchFeatureFlagSnapshot();
-      } else {
-        localStorage.removeItem('token'); // Remove invalid token
-      }
-    }
-    setLoading(false);
-  }, []);
+  const computeAssessmentStatus = (assessments = []) => {
+    const pretestCompleted = assessments.some((assessment) => assessment.assessment_type === 'pretest');
+    const posttestCompleted = assessments.some((assessment) => assessment.assessment_type === 'posttest');
+    return { pretestCompleted, posttestCompleted };
+  };
 
-  const fetchFeatureFlagSnapshot = async () => {
+  const setDefaultAssessmentStatus = () => {
+    setAssessmentStatus({ pretestCompleted: false, posttestCompleted: false, loaded: true });
+  };
+
+  const fetchFeatureFlagSnapshot = useCallback(async () => {
     try {
       const response = await fetchFeatureFlags();
       setFeatureFlags(response.data);
+      return response.data;
     } catch (error) {
       console.error('Failed to load feature flags:', error);
       setFeatureFlags(null);
+      return null;
     }
-  };
+  }, []);
+
+  const fetchAssessmentStatus = useCallback(async () => {
+    try {
+      const response = await getAssessments();
+      const status = computeAssessmentStatus(response.data ?? []);
+      setAssessmentStatus({ ...status, loaded: true });
+      return status;
+    } catch (error) {
+      console.error('Failed to load assessment status:', error);
+      const status = { pretestCompleted: false, posttestCompleted: false };
+      setAssessmentStatus({ ...status, loaded: true });
+      return status;
+    }
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+
+    const initialise = async () => {
+      if (token) {
+        const decodedUser = decodeJwt(token);
+        if (decodedUser) {
+          setIsAuthenticated(true);
+          setUser(decodedUser);
+          await Promise.all([fetchFeatureFlagSnapshot(), fetchAssessmentStatus()]);
+        } else {
+          localStorage.removeItem('token');
+          setDefaultAssessmentStatus();
+        }
+      } else {
+        setDefaultAssessmentStatus();
+      }
+      setLoading(false);
+    };
+
+    initialise();
+  }, [fetchFeatureFlagSnapshot, fetchAssessmentStatus]);
 
   const login = async (credentials) => {
     try {
@@ -60,21 +99,24 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         setUser(decodedUser);
         await fetchFeatureFlagSnapshot();
-        return true;
+        const status = await fetchAssessmentStatus();
+        return status.pretestCompleted ? 'dashboard' : 'pretest';
       } else {
         console.error('Login successful but token invalid.');
         setIsAuthenticated(false);
         setUser(null);
         localStorage.removeItem('token');
         setFeatureFlags(null);
-        return false;
+        setDefaultAssessmentStatus();
+        return 'error';
       }
     } catch (error) {
       console.error('Login failed:', error);
       setIsAuthenticated(false);
       setUser(null);
       setFeatureFlags(null);
-      return false;
+      setDefaultAssessmentStatus();
+      return 'error';
     }
   };
 
@@ -83,14 +125,27 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     setUser(null);
     setFeatureFlags(null);
+    setDefaultAssessmentStatus();
   };
 
   if (loading) {
-    return <div>Loading authentication...</div>; // Or a spinner
+    return <div>Cargando autenticación...</div>;
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, featureFlags, login, logout, refreshFeatureFlags: fetchFeatureFlagSnapshot }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        user,
+        featureFlags,
+        assessmentStatus,
+        loading,
+        login,
+        logout,
+        refreshFeatureFlags: fetchFeatureFlagSnapshot,
+        refreshAssessmentStatus: fetchAssessmentStatus,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
