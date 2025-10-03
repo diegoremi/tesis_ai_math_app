@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import axios from 'axios';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { getStoredPracticeItem, mapDomainToTopic } from '../services/practice.service.js';
 import { getPracticeItemById } from '../services/planner.service.js';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
@@ -74,7 +75,23 @@ export const hintController = async (req: AuthenticatedRequest, res: Response) =
       return res.status(400).json({ message: 'exerciseId (number) is required' });
     }
 
-    const item = await getPracticeItemById(exerciseId);
+    let item = await getStoredPracticeItem(exerciseId);
+
+    if (!item) {
+      const legacy = await getPracticeItemById(exerciseId);
+      if (legacy) {
+        item = {
+          stem: legacy.stem,
+          options: legacy.options.map((option) => ({
+            key: option.key,
+            label: option.label,
+          })),
+          domain: mapDomainToTopic(legacy.domain ?? null),
+          competency: (legacy.competency as any) ?? 'operaciones',
+        };
+      }
+    }
+
     if (!item) {
       return res.status(404).json({ message: 'Practice item not found for hint generation' });
     }

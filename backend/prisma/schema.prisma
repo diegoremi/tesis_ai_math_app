@@ -38,6 +38,8 @@ model User {
   surveySubmissions SurveySubmission[]
   events            Event[]
   practiceSummaries PracticeSummary[]
+  practiceGenerated PracticeGenerated[]
+  practiceAttempts  PracticeAttempt[]
   theoryModules     TheoryModule[]
   theoryProgress    TheoryProgress[]
 }
@@ -302,6 +304,42 @@ model PracticeSummary {
   @@index([user_id])
 }
 
+model PracticeGenerated {
+  practice_generated_id Int      @id @default(autoincrement())
+  user_id               Int
+  session_id            String   @db.VarChar(100)
+  topic                 String?  @db.VarChar(50)
+  difficulty            String?  @db.VarChar(20)
+  item_json             Json
+  status                PracticeItemStatus @default(generated)
+  created_at            DateTime @default(now())
+  consumed_at           DateTime?
+
+  attempts PracticeAttempt[]
+  user     User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id, status])
+  @@index([session_id])
+}
+
+model PracticeAttempt {
+  practice_attempt_id    Int      @id @default(autoincrement())
+  practice_generated_id  Int
+  user_id                Int
+  user_answer            String?  @db.VarChar(10)
+  correct                Boolean
+  explanation            String?  @db.Text
+  domain                 String?  @db.VarChar(50)
+  competency             String?  @db.VarChar(50)
+  created_at             DateTime @default(now())
+
+  generated PracticeGenerated @relation(fields: [practice_generated_id], references: [practice_generated_id], onDelete: Cascade)
+  user      User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([practice_generated_id])
+}
+
 enum EducationLevel {
   high_school
   university
@@ -413,4 +451,10 @@ enum PracticeType {
   exercise
   quiz
   flashcard
+}
+
+enum PracticeItemStatus {
+  generated
+  completed
+  failed
 }

@@ -632,6 +632,113 @@ const posttestItems = [
   },
 ];
 
+const practiceItems = [
+  {
+    test_version: 'practice_v1',
+    domain: 'aritmetica',
+    competency: 'operaciones_basicas',
+    stem: 'Calcula: 48 + 27 - 15.',
+    options: [
+      { key: 'A', label: '58' },
+      { key: 'B', label: '60' },
+      { key: 'C', label: '62' },
+      { key: 'D', label: '64' },
+    ],
+    correct_key: 'B',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'aritmetica',
+    competency: 'fracciones',
+    stem: 'Reduce a fracción irreductible: 6/10.',
+    options: [
+      { key: 'A', label: '1/2' },
+      { key: 'B', label: '2/5' },
+      { key: 'C', label: '3/5' },
+      { key: 'D', label: '4/5' },
+    ],
+    correct_key: 'B',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'porcentajes',
+    competency: 'descuento',
+    stem: 'Un abrigo cuesta S/ 220 y tiene 10% de descuento. ¿Cuánto pagas?',
+    options: [
+      { key: 'A', label: 'S/ 198' },
+      { key: 'B', label: 'S/ 200' },
+      { key: 'C', label: 'S/ 202' },
+      { key: 'D', label: 'S/ 204' },
+    ],
+    correct_key: 'A',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'porcentajes',
+    competency: 'razon',
+    stem: 'Si la razón agua:concentrado es 3:1 y usas 750 ml de agua, ¿cuánto concentrado necesitas?',
+    options: [
+      { key: 'A', label: '150 ml' },
+      { key: 'B', label: '180 ml' },
+      { key: 'C', label: '200 ml' },
+      { key: 'D', label: '250 ml' },
+    ],
+    correct_key: 'C',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'algebra',
+    competency: 'ecuacion_lineal',
+    stem: 'Resuelve: 3x - 4 = 11.',
+    options: [
+      { key: 'A', label: '3' },
+      { key: 'B', label: '4' },
+      { key: 'C', label: '5' },
+      { key: 'D', label: '6' },
+    ],
+    correct_key: 'C',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'algebra',
+    competency: 'simplificacion',
+    stem: 'Simplifica: 5y + 2y - 9.',
+    options: [
+      { key: 'A', label: '7y - 9' },
+      { key: 'B', label: '7y + 9' },
+      { key: 'C', label: '5y - 9' },
+      { key: 'D', label: '2y - 9' },
+    ],
+    correct_key: 'A',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'aritmetica',
+    competency: 'porcentajes_basicos',
+    stem: '¿Cuál es el 25% de 320?',
+    options: [
+      { key: 'A', label: '64' },
+      { key: 'B', label: '72' },
+      { key: 'C', label: '78' },
+      { key: 'D', label: '82' },
+    ],
+    correct_key: 'A',
+  },
+  {
+    test_version: 'practice_v1',
+    domain: 'porcentajes',
+    competency: 'interes_simple',
+    stem: 'Invierte S/ 1 000 al 5% anual de interés simple. ¿Cuánto interés ganas en 2 años?',
+    options: [
+      { key: 'A', label: 'S/ 50' },
+      { key: 'B', label: 'S/ 75' },
+      { key: 'C', label: 'S/ 100' },
+      { key: 'D', label: 'S/ 150' },
+    ],
+    correct_key: 'C',
+  },
+];
+
 const tamItems = [
   {
     instrument: SurveyInstrument.tam,
@@ -790,7 +897,7 @@ async function run() {
   await prisma.surveyItem.deleteMany({});
 
   await prisma.assessmentItem.createMany({
-    data: [...pretestItems, ...posttestItems],
+    data: [...pretestItems, ...posttestItems, ...practiceItems],
     skipDuplicates: true,
   });
 

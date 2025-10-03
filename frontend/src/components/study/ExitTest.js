@@ -34,6 +34,27 @@ const ExitTest = () => {
     fetchItems();
   }, []);
 
+  const SUPERSCRIPT_MAP = {
+    '0': '⁰',
+    '1': '¹',
+    '2': '²',
+    '3': '³',
+    '4': '⁴',
+    '5': '⁵',
+    '6': '⁶',
+    '7': '⁷',
+    '8': '⁸',
+    '9': '⁹',
+  };
+
+  const toSuperscript = (text = '') =>
+    String(text).replace(/\^([0-9]+)/g, (_, digits) =>
+      digits
+        .split('')
+        .map((digit) => SUPERSCRIPT_MAP[digit] ?? digit)
+        .join(''),
+    );
+
   const currentQuestion = items[step];
   const optionList = Array.isArray(currentQuestion?.options) ? currentQuestion.options : [];
 
@@ -165,7 +186,7 @@ const ExitTest = () => {
           </div>
 
           <section className="space-y-5">
-            <h3 className="text-lg font-semibold">{currentQuestion.stem}</h3>
+            <h3 className="text-lg font-semibold">{toSuperscript(currentQuestion.stem)}</h3>
             <div className="grid gap-3">
               {optionList.map((option) => (
                 <button
@@ -178,7 +199,7 @@ const ExitTest = () => {
                       : 'border-gray-700 bg-gray-900 hover:border-sky-500/60'
                   }`}
                 >
-                  {option.label ?? option}
+                  {toSuperscript(option.label ?? option)}
                 </button>
               ))}
             </div>

@@ -2,7 +2,7 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { createActivity, getActivitiesByUserId, getActivityById, updateActivity, deleteActivity } from '../services/activity.service.js';
-import { recommendPracticeItem, gradePracticeAnswer } from '../services/planner.service.js';
+import { fetchNextPracticeItem, submitPracticeAnswer } from '../services/practice.service.js';
 import { logEvent } from '../services/event.service.js';
 
 export const getExerciseController = async (req: AuthenticatedRequest, res: Response) => {
@@ -12,23 +12,33 @@ export const getExerciseController = async (req: AuthenticatedRequest, res: Resp
       return res.status(400).json({ message: 'User ID not found in token' });
     }
 
-    const recommendation = await recommendPracticeItem(userId);
+    const { record, item } = await fetchNextPracticeItem(userId);
+
     await logEvent(userId, {
       event_type: 'session_start',
       metadata: {
         source: 'practice',
-        item_id: recommendation.itemId,
-        domain: recommendation.domain,
-        competency: recommendation.competency,
+        item_id: record.practice_generated_id,
+        session_id: record.session_id,
+        domain: item.meta.domain,
+        competency: item.meta.skill,
       },
     });
 
     res.status(200).json({
-      id: recommendation.itemId,
-      stem: recommendation.stem,
-      options: recommendation.options,
-      domain: recommendation.domain,
-      competency: recommendation.competency,
+      id: record.practice_generated_id,
+      stem: item.stem,
+      options: item.options.map((option: { key: string; text: string }) => ({
+        key: option.key,
+        label: option.text,
+      })),
+      domain: item.meta.domain,
+      competency: item.meta.skill,
+      metadata: {
+        session_id: record.session_id,
+        topic: record.topic,
+        difficulty: record.difficulty,
+      },
     });
   } catch (error) {
     console.error('Unexpected error in getExerciseController:', error);
@@ -49,17 +59,26 @@ export const submitAnswerController = async (req: AuthenticatedRequest, res: Res
       return res.status(400).json({ message: 'Invalid payload. Provide exerciseId and userAnswer.' });
     }
 
-    const result = await gradePracticeAnswer(userId, exerciseId, userAnswer);
+    const result = await submitPracticeAnswer(userId, exerciseId, userAnswer);
 
     await logEvent(userId, {
       event_type: result.correct ? 'correct' : 'incorrect',
       metadata: {
         source: 'practice',
         item_id: exerciseId,
+        domain: result.domain,
+        competency: result.competency,
       },
     });
 
-    res.status(200).json({ correct: result.correct, summary: { attempts: result.attempts, accuracy: result.accuracy } });
+    res.status(200).json({
+      correct: result.correct,
+      explanation: result.explanation,
+      summary: {
+        attempts: result.attempts,
+        accuracy: result.accuracy,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error submitting answer' });
