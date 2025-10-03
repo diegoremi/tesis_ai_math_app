@@ -7,6 +7,7 @@ const Exercises = () => {
   const { featureFlags } = useAuth();
   const chatbotEnabled = Boolean(featureFlags?.chatbot);
   const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
+  const assignedGroup = featureFlags?.assigned_group;
 
   const [exercise, setExercise] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -15,26 +16,41 @@ const Exercises = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hint, setHint] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchExercise();
   }, []);
 
-  const fetchExercise = async () => {
-    setLoading(true);
+  const fetchExercise = async ({ silent = false } = {}) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    if (!silent) {
+      setResult(null);
+      setHint(null);
+    }
     setError(null);
-    setResult(null);
-    setSelectedOption(null);
-    setFreeResponse("");
-    setHint(null);
     try {
       const response = await getExercise();
       setExercise(response.data);
+      setSelectedOption(null);
+      setFreeResponse("");
+      setHint(null);
+      if (silent) {
+        setResult(null);
+      }
     } catch (err) {
       setError("No pudimos cargar un ejercicio nuevo. Intenta nuevamente más tarde.");
       console.error(err);
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -70,8 +86,8 @@ const Exercises = () => {
       setResult(isCorrect ? "¡Correcto!" : "Revisa tus pasos e inténtalo de nuevo.");
       if (isCorrect) {
         setTimeout(() => {
-          fetchExercise();
-        }, 600);
+          fetchExercise({ silent: true });
+        }, 1800);
       }
     } catch (err) {
       setError("Ocurrió un error al enviar tu respuesta.");
@@ -101,13 +117,15 @@ const Exercises = () => {
       <TopNav />
       <main className="flex-1 px-6 md:px-10 py-10">
         <div className="mx-auto max-w-3xl space-y-8">
-          {!adaptativeEnabled && (
+          {featureFlags && (!adaptativeEnabled || assignedGroup === 'GC') && (
             <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              El modo adaptativo está desactivado para tu cohorte. Completa las evaluaciones para activarlo.
+              {assignedGroup === 'GC'
+                ? 'Tu cohorte utiliza la versión sin IA por diseño experimental. Podés practicar normalmente y registrar tus progresos.'
+                : 'Activaremos la práctica adaptativa apenas se complete tu asignación experimental. Consultá con coordinación si el mensaje persiste.'}
             </div>
           )}
 
-          <div className="space-y-4 rounded-2xl bg-[#1c2620] p-6 shadow-lg">
+          <div className="relative space-y-4 rounded-2xl bg-[#1c2620] p-6 shadow-lg">
             <div className="space-y-2">
               <p className="text-sm uppercase tracking-[0.2em] text-[#9eb7a8]">Ejercicio</p>
               <h2 className="text-2xl font-bold">{exercise.stem}</h2>
@@ -141,6 +159,7 @@ const Exercises = () => {
               <button
                 className="flex min-w-[84px] cursor-pointer items-center justify-center rounded-full bg-[var(--primary-color)] px-6 py-3 text-sm font-bold text-[#111714] transition-colors hover:bg-opacity-80"
                 type="submit"
+                disabled={refreshing}
               >
                 Enviar respuesta
               </button>
@@ -163,6 +182,11 @@ const Exercises = () => {
             {hint && (
               <div className="mt-4 p-4 bg-[#29382f] rounded-lg text-sm text-white">
                 {hint}
+              </div>
+            )}
+            {refreshing && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#0b1210]/70">
+                <span className="text-sm text-[#9eb7a8]">Cargando nuevo ejercicio…</span>
               </div>
             )}
           </div>

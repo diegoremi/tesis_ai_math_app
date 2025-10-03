@@ -86,6 +86,22 @@ export const getRandomizationSummary = () => {
   return apiClient.get('/study/randomize/summary');
 };
 
+export const generateTheoryModule = (moduleIndex) => {
+  return apiClient.post('/study/theory/generate', { moduleIndex });
+};
+
+export const recordTheoryProgress = (progressPayload) => {
+  return apiClient.post('/study/theory/progress', progressPayload);
+};
+
+export const submitTheoryCheckpoint = (checkpointPayload) => {
+  return apiClient.post('/study/theory/checkpoint', checkpointPayload);
+};
+
+export const getStudyStatus = () => {
+  return apiClient.get('/study/status');
+};
+
 export const logEvent = (eventPayload) => {
   return apiClient.post('/events', eventPayload);
 };

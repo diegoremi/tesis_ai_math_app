@@ -7,7 +7,7 @@ import TopNav from './layout/TopNav';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { logout, featureFlags } = useAuth();
+  const { logout, featureFlags, studyStatus, refreshStudyStatus } = useAuth();
   const [activities, setActivities] = useState([]);
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +23,7 @@ const Dashboard = () => {
         ]);
         setActivities(activitiesResponse.data);
         setAssessments(assessmentsResponse.data);
+        await refreshStudyStatus();
       } catch (err) {
         console.error(err);
         setError('No pudimos cargar tu información. Inicia sesión nuevamente.');
@@ -34,7 +35,7 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, [logout, navigate]);
+  }, [logout, navigate, refreshStudyStatus]);
 
   if (loading) {
     return <div className="text-center text-white mt-10">Cargando panel...</div>;
@@ -46,6 +47,12 @@ const Dashboard = () => {
 
   const chatbotEnabled = Boolean(featureFlags?.chatbot);
   const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
+  const modulesRemaining = Math.max((studyStatus?.requiredModules ?? 0) - (studyStatus?.modulesCompleted ?? 0), 0);
+  const checkpointsRemaining = Math.max(
+    (studyStatus?.requiredCheckpoints ?? 0) - (studyStatus?.checkpointsPassed ?? 0),
+    0,
+  );
+  const posttestUnlocked = Boolean(studyStatus?.posttestUnlocked);
 
   const getLatestByType = (type) => {
     const filtered = assessments.filter((assessment) => assessment.assessment_type === type);
@@ -103,6 +110,37 @@ const Dashboard = () => {
             </div>
           </div>
 
+          <div className="mb-10 space-y-3 rounded-2xl border border-[#29382f] bg-[#1a221d] p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold">Postest</h2>
+                <p className="text-sm text-[#9eb7a8]">
+                  {posttestUnlocked
+                    ? '¡Listo! Ya cumpliste con los requisitos para rendir el examen final.'
+                    : `Completa ${modulesRemaining} módulos de teoría y ${checkpointsRemaining} ejercicios de práctica para habilitar este examen.`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/study/exit-test')}
+                disabled={!posttestUnlocked}
+                className={`inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition ${
+                  posttestUnlocked
+                    ? 'bg-[var(--primary-color)] text-[#111714] hover:opacity-90'
+                    : 'bg-[#29382f] text-[#6d7d74] cursor-not-allowed'
+                }`}
+              >
+                Rendir postest
+                <span className="material-symbols-outlined text-base">assignment</span>
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-4 text-xs text-[#9eb7a8]">
+              <span>Módulos completados: {studyStatus?.modulesCompleted ?? 0}/{studyStatus?.requiredModules ?? 0}</span>
+              <span>Checkpoints aprobados: {studyStatus?.checkpointsPassed ?? 0}/{studyStatus?.requiredCheckpoints ?? 0}</span>
+              <span>Minutos dedicados a teoría: {studyStatus?.minutesInTheory ?? 0}</span>
+            </div>
+          </div>
+
           <div className="space-y-8">
             <h2 className="text-2xl font-bold border-b border-[#29382f] pb-3">Módulo del día</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
@@ -116,7 +154,7 @@ const Dashboard = () => {
                 <button
                   className="mt-6 w-full md:w-auto flex items-center justify-center gap-2 rounded-full h-12 px-6 bg-[var(--primary-color)] text-black text-base font-bold hover:opacity-90 transition-opacity"
                   type="button"
-                  onClick={() => navigate('/study/pretest')}
+                  onClick={() => navigate('/theory')}
                 >
                   <span>Ir a teoría</span>
                   <span className="material-symbols-outlined">arrow_forward</span>

@@ -1,6 +1,12 @@
 
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import { login as apiLogin, logout as apiLogout, fetchFeatureFlags, getAssessments } from '../services/api';
+import {
+  login as apiLogin,
+  logout as apiLogout,
+  fetchFeatureFlags,
+  getAssessments,
+  getStudyStatus,
+} from '../services/api';
 
 // Helper function to decode JWT (basic, for demonstration)
 const decodeJwt = (token) => {
@@ -29,6 +35,15 @@ export const AuthProvider = ({ children }) => {
     posttestCompleted: false,
     loaded: false,
   });
+  const [studyStatus, setStudyStatus] = useState({
+    modulesCompleted: 0,
+    checkpointsPassed: 0,
+    minutesInTheory: 0,
+    requiredModules: 0,
+    requiredCheckpoints: 0,
+    posttestUnlocked: false,
+    loaded: false,
+  });
 
   const computeAssessmentStatus = (assessments = []) => {
     const pretestCompleted = assessments.some((assessment) => assessment.assessment_type === 'pretest');
@@ -36,9 +51,21 @@ export const AuthProvider = ({ children }) => {
     return { pretestCompleted, posttestCompleted };
   };
 
-  const setDefaultAssessmentStatus = () => {
+  const setDefaultAssessmentStatus = useCallback(() => {
     setAssessmentStatus({ pretestCompleted: false, posttestCompleted: false, loaded: true });
-  };
+  }, []);
+
+  const setDefaultStudyStatus = useCallback(() => {
+    setStudyStatus({
+      modulesCompleted: 0,
+      checkpointsPassed: 0,
+      minutesInTheory: 0,
+      requiredModules: 0,
+      requiredCheckpoints: 0,
+      posttestUnlocked: false,
+      loaded: true,
+    });
+  }, []);
 
   const fetchFeatureFlagSnapshot = useCallback(async () => {
     try {
@@ -66,6 +93,18 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const fetchStudyStatusSnapshot = useCallback(async () => {
+    try {
+      const response = await getStudyStatus();
+      setStudyStatus({ ...response.data, loaded: true });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to load study status:', error);
+      setDefaultStudyStatus();
+      return null;
+    }
+  }, [setDefaultStudyStatus]);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
 
@@ -75,58 +114,83 @@ export const AuthProvider = ({ children }) => {
         if (decodedUser) {
           setIsAuthenticated(true);
           setUser(decodedUser);
-          await Promise.all([fetchFeatureFlagSnapshot(), fetchAssessmentStatus()]);
+          await Promise.all([
+            fetchFeatureFlagSnapshot(),
+            fetchAssessmentStatus(),
+            fetchStudyStatusSnapshot(),
+          ]);
         } else {
           localStorage.removeItem('token');
           setDefaultAssessmentStatus();
+          setDefaultStudyStatus();
         }
       } else {
         setDefaultAssessmentStatus();
+        setDefaultStudyStatus();
       }
       setLoading(false);
     };
 
     initialise();
-  }, [fetchFeatureFlagSnapshot, fetchAssessmentStatus]);
+  }, [
+    fetchFeatureFlagSnapshot,
+    fetchAssessmentStatus,
+    fetchStudyStatusSnapshot,
+    setDefaultAssessmentStatus,
+    setDefaultStudyStatus,
+  ]);
 
-  const login = async (credentials) => {
-    try {
-      const response = await apiLogin(credentials);
-      const token = response.data.token;
-      localStorage.setItem('token', token);
-      const decodedUser = decodeJwt(token);
-      if (decodedUser) {
-        setIsAuthenticated(true);
-        setUser(decodedUser);
-        await fetchFeatureFlagSnapshot();
-        const status = await fetchAssessmentStatus();
-        return status.pretestCompleted ? 'dashboard' : 'pretest';
-      } else {
+  const login = useCallback(
+    async (credentials) => {
+      try {
+        const response = await apiLogin(credentials);
+        const token = response.data.token;
+        localStorage.setItem('token', token);
+        const decodedUser = decodeJwt(token);
+        if (decodedUser) {
+          setIsAuthenticated(true);
+          setUser(decodedUser);
+          await fetchFeatureFlagSnapshot();
+          const status = await fetchAssessmentStatus();
+          await fetchStudyStatusSnapshot();
+          return status.pretestCompleted ? 'dashboard' : 'pretest';
+        }
+
         console.error('Login successful but token invalid.');
         setIsAuthenticated(false);
         setUser(null);
         localStorage.removeItem('token');
         setFeatureFlags(null);
         setDefaultAssessmentStatus();
+        setDefaultStudyStatus();
+        return 'error';
+      } catch (error) {
+        console.error('Login failed:', error);
+        setIsAuthenticated(false);
+        setUser(null);
+        setFeatureFlags(null);
+        setDefaultAssessmentStatus();
+        setDefaultStudyStatus();
         return 'error';
       }
-    } catch (error) {
-      console.error('Login failed:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setFeatureFlags(null);
-      setDefaultAssessmentStatus();
-      return 'error';
-    }
-  };
+    },
+    [
+      fetchFeatureFlagSnapshot,
+      fetchAssessmentStatus,
+      fetchStudyStatusSnapshot,
+      setDefaultAssessmentStatus,
+      setDefaultStudyStatus,
+    ],
+  );
 
-  const logout = () => {
+  const logout = useCallback(() => {
     apiLogout();
     setIsAuthenticated(false);
     setUser(null);
     setFeatureFlags(null);
     setDefaultAssessmentStatus();
-  };
+    setDefaultStudyStatus();
+  }, [setDefaultAssessmentStatus, setDefaultStudyStatus]);
 
   if (loading) {
     return <div>Cargando autenticación...</div>;
@@ -139,11 +203,13 @@ export const AuthProvider = ({ children }) => {
         user,
         featureFlags,
         assessmentStatus,
+        studyStatus,
         loading,
         login,
         logout,
         refreshFeatureFlags: fetchFeatureFlagSnapshot,
         refreshAssessmentStatus: fetchAssessmentStatus,
+        refreshStudyStatus: fetchStudyStatusSnapshot,
       }}
     >
       {children}

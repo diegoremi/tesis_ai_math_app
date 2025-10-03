@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -37,6 +38,8 @@ model User {
   surveySubmissions SurveySubmission[]
   events            Event[]
   practiceSummaries PracticeSummary[]
+  theoryModules     TheoryModule[]
+  theoryProgress    TheoryProgress[]
 }
 
 model Session {
@@ -101,6 +104,40 @@ model Survey {
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
+  @@index([user_id])
+}
+
+model TheoryModule {
+  module_id    Int      @id @default(autoincrement())
+  user_id      Int
+  module_index Int
+  title        String   @db.VarChar(200)
+  description  String?  @db.Text
+  content      Json
+  version      String?  @db.VarChar(50)
+  generated_at DateTime @default(now())
+
+  user     User             @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  progress TheoryProgress[]
+
+  @@unique([user_id, module_index])
+  @@index([user_id])
+}
+
+model TheoryProgress {
+  theory_progress_id Int       @id @default(autoincrement())
+  module_id          Int
+  user_id            Int
+  progress           Float     @default(0)
+  seconds_spent      Int       @default(0)
+  checkpoint_passed  Boolean   @default(false)
+  completed_at       DateTime?
+  updated_at         DateTime  @updatedAt
+
+  module TheoryModule @relation(fields: [module_id], references: [module_id], onDelete: Cascade)
+  user   User         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@unique([module_id, user_id])
   @@index([user_id])
 }
 
@@ -366,6 +403,10 @@ enum EventType {
   incorrect
   streak
   goal_met
+  theory_start
+  theory_progress
+  theory_end
+  checkpoint_passed
 }
 
 enum PracticeType {

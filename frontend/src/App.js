@@ -11,14 +11,20 @@ import Register from './components/auth/Register';
 import Consent from './components/study/Consent';
 import IntroductoryTest from './components/study/IntroductoryTest';
 import ExitTest from './components/study/ExitTest';
+import Theory from './components/Theory';
 import './App.css';
 
 // Simple ProtectedRoute component
-const ProtectedRoute = ({ children, skipPretestCheck = false }) => {
-  const { isAuthenticated, loading, assessmentStatus } = useAuth();
+const ProtectedRoute = ({ children, skipPretestCheck = false, requirePosttestUnlock = false }) => {
+  const { isAuthenticated, loading, assessmentStatus, studyStatus } = useAuth();
   const location = useLocation();
 
-  if (loading || !assessmentStatus.loaded) {
+  const prerequisitesLoading =
+    loading ||
+    !assessmentStatus.loaded ||
+    !studyStatus.loaded;
+
+  if (prerequisitesLoading) {
     return <div>Cargando autenticación...</div>;
   }
 
@@ -28,6 +34,10 @@ const ProtectedRoute = ({ children, skipPretestCheck = false }) => {
   const onPretestPage = location.pathname.startsWith('/study/pretest');
   if (!skipPretestCheck && !assessmentStatus.pretestCompleted && !onPretestPage) {
     return <Navigate to="/study/pretest" replace />;
+  }
+
+  if (requirePosttestUnlock && !studyStatus.posttestUnlocked) {
+    return <Navigate to="/dashboard" replace state={{ reason: 'posttest_locked' }} />;
   }
   return children;
 };
@@ -67,7 +77,7 @@ function App() {
           <Route
             path="/study/exit-test"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requirePosttestUnlock>
                 <ExitTest />
               </ProtectedRoute>
             }
@@ -85,6 +95,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Exercises />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/theory"
+            element={
+              <ProtectedRoute>
+                <Theory />
               </ProtectedRoute>
             }
           />

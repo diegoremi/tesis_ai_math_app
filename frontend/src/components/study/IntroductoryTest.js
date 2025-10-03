@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../../services/api';
 import { useAuth } from 'context/AuthContext';
+import AppBrand from '../layout/AppBrand';
 
 const IntroductoryTest = () => {
   const navigate = useNavigate();
@@ -134,15 +135,14 @@ const IntroductoryTest = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-50" style={{ fontFamily: '"Spline Sans", "Noto Sans", sans-serif' }}>
-      <header className="flex items-center justify-between border-b border-gray-800 px-8 py-4">
-        <div className="flex items-center gap-3 text-white">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">AI</span>
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-gray-400">Evaluación inicial</p>
-            <h1 className="text-xl font-semibold">Pretest diagnóstico</h1>
+      <header className="flex flex-col gap-4 border-b border-gray-800 px-8 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2 text-white">
+          <AppBrand />
+          <div className="text-xs uppercase tracking-[0.35em] text-gray-400">
+            <span>Evaluación inicial · Pretest diagnóstico</span>
           </div>
         </div>
-        <span className="text-sm text-gray-400">Tiempo sugerido: 15 min</span>
+        <span className="text-sm text-gray-400">Tiempo estimado: 15 minutos</span>
       </header>
 
       <main className="px-6 py-12 flex justify-center">

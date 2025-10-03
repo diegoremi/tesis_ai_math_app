@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitConsent } from '../../services/api';
+import AppBrand from '../layout/AppBrand';
 
 const Consent = () => {
   const navigate = useNavigate();
@@ -12,10 +13,20 @@ const Consent = () => {
     setStatus(null);
     try {
       await submitConsent({ documentVersion: 'v1', accepted });
-      setStatus({ type: 'success', accepted, message: accepted ? 'Consent recorded. Thank you for participating.' : 'You have declined participation.' });
+      setStatus({
+        type: 'success',
+        accepted,
+        message: accepted
+          ? 'Consentimiento registrado. ¡Gracias por participar!'
+          : 'Se registró que preferís no participar.',
+      });
     } catch (error) {
       console.error('Error recording consent:', error);
-      setStatus({ type: 'error', accepted: false, message: 'Unable to record your consent. Please try again.' });
+      setStatus({
+        type: 'error',
+        accepted: false,
+        message: 'No pudimos registrar tu respuesta. Intenta nuevamente.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -25,13 +36,7 @@ const Consent = () => {
     <div className="min-h-screen bg-[#0b1210] text-white">
       <div className="max-w-4xl mx-auto px-6 py-12">
         <header className="flex items-center justify-between border-b border-[#1f2c26] pb-6">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 flex items-center justify-center rounded-full bg-[#123427] text-[#38ef7d] font-bold">AI</div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-[#6aa58e]">Tesis UNLP</p>
-              <h1 className="text-2xl font-semibold tracking-tight">Programa de Aprendizaje Autónomo en Matemática</h1>
-            </div>
-          </div>
+          <AppBrand subtitle="Tesis UNLP" />
           <span className="text-sm text-[#6aa58e]">Fase piloto 2025</span>
         </header>
 
@@ -95,7 +100,7 @@ const Consent = () => {
                     className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-[#38ef7d] px-5 py-2 text-sm font-semibold text-[#0b1210] hover:bg-[#2dd970] transition"
                     onClick={() => navigate('/study/pretest')}
                   >
-                    Continue to pretest
+                    Continuar al pretest
                     <span className="material-symbols-outlined text-base">arrow_forward</span>
                   </button>
                 )}

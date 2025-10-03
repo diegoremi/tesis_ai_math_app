@@ -1,8 +1,10 @@
 
 import os
 import json
+import random
 import re
-from typing import List, Optional
+from datetime import datetime
+from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -26,6 +28,13 @@ class HintRequest(BaseModel):
     options: Optional[List[dict]] = None
     domain: Optional[str] = None
     competency: Optional[str] = None
+
+
+class TheoryModuleRequest(BaseModel):
+    participantProfile: Dict[str, Any]
+    pretestSummary: Optional[Dict[str, Any]] = None
+    reflection: Optional[str] = None
+    moduleIndex: int = 0
 
 
 def has_gemini_key() -> bool:
@@ -123,3 +132,137 @@ def generate_hint(request: HintRequest):
         return {"hint": response.text.strip() if response.text else "Try breaking the problem into simpler steps."}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+
+
+@app.post("/generate/theory-module")
+def generate_theory_module(payload: TheoryModuleRequest):
+    module_index = max(payload.moduleIndex, 0)
+    profile = payload.participantProfile or {}
+
+    if not has_gemini_key():
+        return _fallback_theory_module(payload)
+
+    try:
+        system_prompt = (
+            "Eres un diseñador instruccional de matemática. Devuelves JSON válido con la forma:"
+            " {\"title\": str, \"description\": str, \"version\": str, \"sections\": [ ... ], \"checkpoint\": {...}}."
+            " Cada sección puede incluir elementos: texto simple, objetos {\"math\": Latex}, {\"callout\": str},"
+            " o {\"visualization\": {\"type\": \"plotly\", \"data\": [...], \"layout\": {...}}}."
+            " Ajusta el tono al nivel académico y edad del participante."
+        )
+
+        request = {
+            "profile": profile,
+            "pretest": payload.pretestSummary,
+            "reflection": redact(payload.reflection or "") if payload.reflection else None,
+            "moduleIndex": module_index,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        model = genai.GenerativeModel('gemini-2.0-flash-lite', system_instruction=system_prompt)
+        response = model.generate_content(
+            json.dumps(
+              {
+                "instruction": "Genera contenido pedagógico personalizado.",
+                "request": request,
+              }
+            )
+        )
+        if not response.text:
+            return _fallback_theory_module(payload)
+        try:
+            parsed = json.loads(response.text)
+        except json.JSONDecodeError:
+            return _fallback_theory_module(payload)
+        parsed.setdefault("moduleId", f"generated-{module_index}")
+        parsed.setdefault("version", "ai-v1")
+        parsed.setdefault("title", f"Módulo {module_index + 1}")
+        return parsed
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+
+
+def _fallback_theory_module(payload: TheoryModuleRequest) -> Dict[str, Any]:
+    profile = payload.participantProfile or {}
+    level = profile.get("mathLevel", "intermediate") or "intermediate"
+    topic = {
+        "beginner": "Fracciones y proporciones",
+        "intermediate": "Funciones lineales",
+        "advanced": "Optimización cuadrática",
+    }.get(level, "Fundamentos matemáticos")
+
+    rand_seed = profile.get("age", 20) + payload.moduleIndex
+    random.seed(rand_seed)
+    offset = random.randint(1, 5)
+
+    return {
+        "moduleId": f"fallback-{payload.moduleIndex}",
+        "version": "fallback",
+        "title": f"Módulo {payload.moduleIndex + 1}: {topic}",
+        "description": "Este módulo se generó localmente cuando el servicio IA no estuvo disponible.",
+        "sections": [
+            {
+                "heading": "Objetivo del módulo",
+                "body": [
+                    f"Comprender los conceptos principales de {topic.lower()} y aplicarlos en ejercicios contextualizados.",
+                    {
+                        "callout": "Recuerda repasar el pretest para identificar tus áreas de mejora.",
+                    },
+                ],
+            },
+            {
+                "heading": "Derivación clave",
+                "body": [
+                    {
+                        "math": "\\text{Si } f(x) = mx + b, \\text{ entonces } f(0) = b \\text{ y } f(1) = m + b",
+                    },
+                    "Interpretá la pendiente m como la tasa de variación entre dos puntos consecutivos.",
+                ],
+            },
+            {
+                "visualization": {
+                    "type": "plotly",
+                    "data": [
+                        {
+                            "x": [0, 1, 2, 3, 4],
+                            "y": [random.randint(1, 4) + offset * i for i in range(5)],
+                            "type": "scatter",
+                            "mode": "lines+markers",
+                            "name": "Progreso estimado",
+                        }
+                    ],
+                    "layout": {
+                        "title": "Tendencia de aprendizaje",
+                        "xaxis": {"title": "Sesión"},
+                        "yaxis": {"title": "Puntaje"},
+                    },
+                }
+            },
+        ],
+        "checkpoint": {
+            "questions": [
+                {
+                    "id": "q1",
+                    "stem": "Resuelve la ecuación $2x + 6 = 14$. ¿Cuál es el valor de $x$?",
+                    "options": [
+                        {"key": "A", "label": "2"},
+                        {"key": "B", "label": "3"},
+                        {"key": "C", "label": "4"},
+                        {"key": "D", "label": "5"},
+                    ],
+                    "correct": "C",
+                },
+                {
+                    "id": "q2",
+                    "stem": "Si una recta pasa por (0,2) con pendiente 3, ¿cuál es su ecuación?",
+                    "options": [
+                        {"key": "A", "label": "y = 3x"},
+                        {"key": "B", "label": "y = 3x + 2"},
+                        {"key": "C", "label": "y = 2x + 3"},
+                        {"key": "D", "label": "y = 2x"},
+                    ],
+                    "correct": "B",
+                },
+            ]
+        }
+    }

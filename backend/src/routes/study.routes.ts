@@ -5,6 +5,10 @@ import {
   randomizeParticipantsController,
   getFeatureFlagsController,
   getRandomizationSummaryController,
+  generateTheoryModuleController,
+  recordTheoryProgressController,
+  submitTheoryCheckpointController,
+  getStudyStatusController,
 } from '../controllers/study.controller.js';
 
 const router = Router();
@@ -15,5 +19,9 @@ router.post('/consent', submitConsentController);
 router.post('/randomize', authorizeRole(['admin']), randomizeParticipantsController);
 router.get('/feature-flags', getFeatureFlagsController);
 router.get('/randomize/summary', authorizeRole(['admin']), getRandomizationSummaryController);
+router.post('/theory/generate', generateTheoryModuleController);
+router.post('/theory/progress', recordTheoryProgressController);
+router.post('/theory/checkpoint', submitTheoryCheckpointController);
+router.get('/status', getStudyStatusController);
 
 export default router;
