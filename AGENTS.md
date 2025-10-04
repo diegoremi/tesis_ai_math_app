@@ -41,7 +41,7 @@ flowchart LR
 - Usa **pretest**, errores por dominio y telemetría (`eventos`) para planificar **siguientes ejercicios** (dificultad adaptativa).
 - Entrega objetivos de sesión (p. ej., “≥3 sesiones/semana”).
 - Genera módulos de teoría personalizados vía FastAPI + Gemini (`/study/theory/generate`) para participantes **GE**.
-- Para cohortes **GC** o si el servicio IA falla, se sirve una biblioteca de módulos estáticos (3 plantillas rotativas) con teoría, ejemplos guiados, visualizaciones y checkpoints precurados; los registros en `theoryModules` indican `version=control-v1` o `fallback` según corresponda.
+- Para cohortes **GC** o si el servicio IA falla, se sirve una biblioteca de módulos estáticos (6 plantillas rotativas) con teoría, ejemplos guiados, visualizaciones y checkpoints precurados; los registros en `theoryModules` indican `version=control-v1` o `fallback` según corresponda.
 - El backend controla condiciones de carrera (`P2002`) y reutiliza módulos recientes.
 
 ### 2.3 PracticeGen Agent (nuevo)
