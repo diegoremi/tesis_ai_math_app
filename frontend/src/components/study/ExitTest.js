@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../../services/api';
 import { useAuth } from 'context/AuthContext';
 import AppBrand from '../layout/AppBrand';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 const ExitTest = () => {
   const navigate = useNavigate();
@@ -117,11 +118,7 @@ const ExitTest = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">Cargando exit test…</p>
-      </div>
-    );
+    return <LoadingSpinner label="Cargando exit test…" fullscreen subdued />;
   }
 
   if (submitted) {

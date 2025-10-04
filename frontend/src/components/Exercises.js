@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { Fragment, useEffect, useState } from "react";
+import { InlineMath, BlockMath } from "react-katex";
+import "katex/dist/katex.min.css";
 import { getExercise, submitAnswer, getHint } from "../services/api";
 import { useAuth } from "context/AuthContext";
 import TopNav from "./layout/TopNav";
+import LoadingSpinner from "./common/LoadingSpinner";
 
 const Exercises = () => {
   const { featureFlags } = useAuth();
   const chatbotEnabled = Boolean(featureFlags?.chatbot);
   const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
-  const assignedGroup = featureFlags?.assigned_group;
 
   const [exercise, setExercise] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
@@ -18,36 +20,84 @@ const Exercises = () => {
   const [hint, setHint] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const SUPERSCRIPT_MAP = {
-    0: "⁰",
-    1: "¹",
-    2: "²",
-    3: "³",
-    4: "⁴",
-    5: "⁵",
-    6: "⁶",
-    7: "⁷",
-    8: "⁸",
-    9: "⁹",
+  const MATH_REGEX = /(\$\$[^$]+\$\$|\$[^$]+\$)/g;
+
+  const splitMathSegments = (text) => {
+    return String(text ?? "")
+      .split(MATH_REGEX)
+      .filter(Boolean)
+      .map((segment) => {
+        const trimmed = segment.trim();
+        if (trimmed.startsWith("$$") && trimmed.endsWith("$$")) {
+          return { type: "block", math: trimmed.slice(2, -2).trim() };
+        }
+        if (trimmed.startsWith("$") && trimmed.endsWith("$")) {
+          return { type: "inline", math: trimmed.slice(1, -1).trim() };
+        }
+        return { type: "text", text: segment };
+      });
   };
 
-  const toSuperscript = (text = "") =>
-    String(text).replace(/\^([0-9]+)/g, (_, digits) =>
-      digits
-        .split("")
-        .map((digit) => SUPERSCRIPT_MAP[digit] ?? digit)
-        .join("")
-    );
+  const renderRichText = (value, keyPrefix) => {
+    const segments = splitMathSegments(value);
+    const nodes = [];
+    let inlineBuffer = [];
 
-  const renderText = (value = "") => {
-    const superscript = toSuperscript(value);
-    const parts = superscript.split(/\n+/);
-    return parts.map((part, index) => (
-      <span key={`${part}-${index}`}>
-        {part}
-        {index < parts.length - 1 && <br />}
-      </span>
-    ));
+    const flushBuffer = () => {
+      if (!inlineBuffer.length) return;
+      nodes.push(
+        <p key={`${keyPrefix}-p-${nodes.length}`} className="text-base leading-relaxed">
+          {inlineBuffer.map((segment, index) =>
+            segment.type === "inline" ? (
+              <InlineMath key={`${keyPrefix}-inline-${index}`} math={segment.math} />
+            ) : (
+              <Fragment key={`${keyPrefix}-text-${index}`}>{segment.text}</Fragment>
+            ),
+          )}
+        </p>,
+      );
+      inlineBuffer = [];
+    };
+
+    segments.forEach((segment, index) => {
+      if (segment.type === "block") {
+        flushBuffer();
+        nodes.push(
+          <div key={`${keyPrefix}-block-${index}`} className="my-2">
+            <BlockMath math={segment.math} />
+          </div>,
+        );
+      } else {
+        inlineBuffer.push(segment);
+      }
+    });
+
+    flushBuffer();
+
+    if (!nodes.length) {
+      return [
+        <p key={`${keyPrefix}-p-0`} className="text-base leading-relaxed">
+          {value}
+        </p>,
+      ];
+    }
+    return nodes;
+  };
+
+  const renderInlineText = (value, keyPrefix) => {
+    return splitMathSegments(value).map((segment, index) => {
+      if (segment.type === "block") {
+        return (
+          <span key={`${keyPrefix}-block-${index}`} className="block my-2">
+            <BlockMath math={segment.math} />
+          </span>
+        );
+      }
+      if (segment.type === "inline") {
+        return <InlineMath key={`${keyPrefix}-inline-${index}`} math={segment.math} />;
+      }
+      return <Fragment key={`${keyPrefix}-text-${index}`}>{segment.text}</Fragment>;
+    });
   };
 
   useEffect(() => {
@@ -130,7 +180,7 @@ const Exercises = () => {
   const hasOptions = Array.isArray(exercise?.options) && exercise.options.length > 0;
 
   if (loading) {
-    return <div className="min-h-screen bg-[#0b1210] text-white text-center pt-20">Cargando práctica…</div>;
+    return <LoadingSpinner label="Cargando práctica…" fullscreen />;
   }
 
   if (error) {
@@ -149,18 +199,18 @@ const Exercises = () => {
       <TopNav />
       <main className="flex-1 px-6 md:px-10 py-10">
         <div className="mx-auto max-w-3xl space-y-8">
-          {featureFlags && (!adaptativeEnabled || assignedGroup === 'GC') && (
+          {featureFlags && !adaptativeEnabled && (
             <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              {assignedGroup === 'GC'
-                ? 'Tu cohorte utiliza la versión sin IA por diseño experimental. Podés practicar normalmente y registrar tus progresos.'
-                : 'Activaremos la práctica adaptativa apenas se complete tu asignación experimental. Consultá con coordinación si el mensaje persiste.'}
+              Estamos desplegando la práctica adaptativa de forma gradual. Mientras tanto, continúa con la secuencia base para consolidar tus habilidades.
             </div>
           )}
 
           <div className="relative space-y-4 rounded-2xl bg-[#1c2620] p-6 shadow-lg">
             <div className="space-y-2">
               <p className="text-sm uppercase tracking-[0.2em] text-[#9eb7a8]">Ejercicio</p>
-              <h2 className="text-2xl font-bold">{renderText(exercise.stem)}</h2>
+              <div className="space-y-2 text-2xl font-bold">
+                {renderRichText(exercise.stem, "stem")}
+              </div>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               {hasOptions ? (
@@ -176,7 +226,9 @@ const Exercises = () => {
                           : 'border-[#3d5245] bg-[#111714] text-[#d2e4da] hover:border-[var(--primary-color)]/60'
                       }`}
                     >
-                      {renderText(option.label)}
+                      <span className="text-base leading-relaxed">
+                        {renderInlineText(option.label ?? option.text ?? '', `option-${option.key}`)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -218,7 +270,12 @@ const Exercises = () => {
             )}
             {refreshing && (
               <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#0b1210]/70">
-                <span className="text-sm text-[#9eb7a8]">Cargando nuevo ejercicio…</span>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#1f2b26]">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-transparent border-t-[var(--primary-color)]" />
+                  </div>
+                  <span className="text-sm text-[#9eb7a8]">Cargando nuevo ejercicio…</span>
+                </div>
               </div>
             )}
           </div>

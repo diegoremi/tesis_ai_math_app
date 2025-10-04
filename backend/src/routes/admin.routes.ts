@@ -6,6 +6,8 @@ import {
   getAssessmentsController as getAllAssessmentsController,
   exportDataController,
   exportAncovaDatasetController,
+  updateFeatureFlagsAdminController,
+  exportFullReportController,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -19,5 +21,7 @@ router.get('/activities', getAllActivitiesController);
 router.get('/assessments', getAllAssessmentsController);
 router.get('/export', exportDataController);
 router.get('/exports/ancova-dataset', exportAncovaDatasetController);
+router.get('/export/report', exportFullReportController);
+router.patch('/users/:userId/feature-flags', updateFeatureFlagsAdminController);
 
 export default router;

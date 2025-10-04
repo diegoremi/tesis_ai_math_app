@@ -13,6 +13,277 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
 const MIN_MODULES_REQUIRED = Number.parseInt(process.env.MIN_THEORY_MODULES_REQUIRED ?? '3', 10);
 const MIN_CHECKPOINTS_REQUIRED = Number.parseInt(process.env.MIN_THEORY_CHECKPOINTS_REQUIRED ?? '3', 10);
 
+type StaticSection = {
+  heading?: string;
+  body?: Array<string | { math?: string; callout?: string }>;
+  visualization?: {
+    type: string;
+    data: unknown[];
+    layout?: Record<string, unknown>;
+  };
+};
+
+type StaticModuleBlueprint = {
+  title: string;
+  description: string;
+  sections: StaticSection[];
+  checkpoint: {
+    questions: Array<{
+      id: string;
+      stem: string;
+      options: Array<{ key: string; label: string }>;
+      correct: string;
+    }>;
+  };
+};
+
+const STATIC_MODULE_LIBRARY: StaticModuleBlueprint[] = [
+  {
+    title: 'Módulo 1: Fundamentos numéricos',
+    description: 'Consolida operaciones con números enteros y fracciones aplicadas a situaciones cotidianas.',
+    sections: [
+      {
+        heading: 'Recordatorio conceptual',
+        body: [
+          'Las operaciones básicas respetan propiedades que simplifican los cálculos mentales. Aprovecha la conmutatividad y asociatividad para reagrupar términos.',
+          { math: 'a + b = b + a' },
+          { math: '(a + b) + c = a + (b + c)' },
+          { callout: 'Verifica signos y unidades para evitar errores de interpretación.' },
+        ],
+      },
+      {
+        heading: 'Ejemplo guiado',
+        body: [
+          'Una cooperativa reparte $3\\tfrac{1}{2}$ kg de arroz y $2\\tfrac{3}{4}$ kg de quinua en una jornada. ¿Cuánto alimento se distribuye?',
+          'Convierte a fracciones impropias y usa un denominador común.',
+          { math: '\\frac{7}{2} + \\frac{11}{4} = \\frac{14}{4} + \\frac{11}{4} = \\frac{25}{4} = 6\\tfrac{1}{4}' },
+          { callout: 'La cooperativa entrega 6,25 kg en total. Intenta explicar el procedimiento con tus propias palabras.' },
+        ],
+      },
+      {
+        heading: 'Aplicación contextual',
+        body: [
+          'La gráfica muestra el avance de ejercicios correctos durante la semana. Observa cómo pequeñas prácticas diarias acumulan progreso.',
+        ],
+        visualization: {
+          type: 'plotly',
+          data: [
+            {
+              x: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+              y: [6, 8, 10, 12, 15],
+              type: 'bar',
+              marker: { color: '#38ef7d' },
+            },
+          ],
+          layout: {
+            title: 'Ejercicios correctos por sesión',
+            xaxis: { title: 'Sesión' },
+            yaxis: { title: 'Ejercicios' },
+          },
+        },
+      },
+    ],
+    checkpoint: {
+      questions: [
+        {
+          id: 'm1-q1',
+          stem: 'Resuelve $\\frac{5}{4} + \\frac{7}{8}$.',
+          options: [
+            { key: 'A', label: '$\\tfrac{3}{2}$' },
+            { key: 'B', label: '$\\tfrac{21}{16}$' },
+            { key: 'C', label: '$\\tfrac{17}{8}$' },
+            { key: 'D', label: '$\\tfrac{19}{16}$' },
+          ],
+          correct: 'D',
+        },
+        {
+          id: 'm1-q2',
+          stem: 'Un taller produce 45 piezas el lunes y 38 el martes. ¿Cuántas piezas produce en total?',
+          options: [
+            { key: 'A', label: '76' },
+            { key: 'B', label: '80' },
+            { key: 'C', label: '83' },
+            { key: 'D', label: '88' },
+          ],
+          correct: 'C',
+        },
+      ],
+    },
+  },
+  {
+    title: 'Módulo 2: Proporciones y porcentajes',
+    description: 'Relaciona razones, porcentajes y escalas para interpretar descuentos y mezclas.',
+    sections: [
+      {
+        heading: 'Recordatorio conceptual',
+        body: [
+          'Una razón compara dos magnitudes. El porcentaje es una razón referida a 100. Mantén la equivalencia multiplicando ambas cantidades por el mismo factor.',
+          { math: '\\frac{a}{b} = \\frac{ka}{kb}' },
+        ],
+      },
+      {
+        heading: 'Caso aplicado',
+        body: [
+          'Una tienda aplica 15% de descuento a un artículo de S/ 240 y luego ofrece 10% adicional sobre el nuevo precio. Calcula el monto final.',
+          { math: '240 \\times 0.85 = 204' },
+          { math: '204 \\times 0.90 = 183.6' },
+          { callout: 'El precio final es S/ 183.60. Aplicar los descuentos de forma secuencial evita errores de suma.' },
+        ],
+      },
+      {
+        heading: 'Mini proyecto',
+        body: [
+          'Analiza la mezcla de un jugo donde la razón agua:concentrado es 3:2. Completa la tabla para distintas proporciones.',
+        ],
+        visualization: {
+          type: 'plotly',
+          data: [
+            {
+              x: [3, 6, 9],
+              y: [2, 4, 6],
+              type: 'scatter',
+              mode: 'lines+markers',
+              name: 'Agua vs Concentrado',
+              marker: { color: '#4acbb2' },
+            },
+          ],
+          layout: {
+            title: 'Razón constante 3:2',
+            xaxis: { title: 'Agua (partes)' },
+            yaxis: { title: 'Concentrado (partes)' },
+          },
+        },
+      },
+    ],
+    checkpoint: {
+      questions: [
+        {
+          id: 'm2-q1',
+          stem: 'Un precio aumenta 12% y luego disminuye 12%. ¿Cuál es la variación neta?',
+          options: [
+            { key: 'A', label: '0%' },
+            { key: 'B', label: '1.44% de disminución' },
+            { key: 'C', label: '1.44% de aumento' },
+            { key: 'D', label: '12% de disminución' },
+          ],
+          correct: 'B',
+        },
+        {
+          id: 'm2-q2',
+          stem: 'Completa: si 5 cuadernos cuestan S/ 40, ¿cuánto costarán 8 cuadernos?',
+          options: [
+            { key: 'A', label: 'S/ 56' },
+            { key: 'B', label: 'S/ 60' },
+            { key: 'C', label: 'S/ 64' },
+            { key: 'D', label: 'S/ 72' },
+          ],
+          correct: 'C',
+        },
+      ],
+    },
+  },
+  {
+    title: 'Módulo 3: Álgebra en contexto',
+    description: 'Modela situaciones con ecuaciones lineales y analiza tendencias con datos reales.',
+    sections: [
+      {
+        heading: 'Recordatorio conceptual',
+        body: [
+          'Una ecuación lineal se puede escribir como $y = mx + b$, donde $m$ es la pendiente y $b$ la intersección con el eje vertical.',
+          { callout: 'La pendiente describe el cambio promedio por unidad en $x$.' },
+        ],
+      },
+      {
+        heading: 'Ejemplo guiado',
+        body: [
+          'Resuelve $2x + 6 = 14$. Despeja la incógnita restando 6 a ambos lados y dividiendo entre 2.',
+          { math: '2x = 8' },
+          { math: 'x = 4' },
+          { callout: 'Interpreta el resultado: con 4 unidades se satisface la ecuación inicial.' },
+        ],
+      },
+      {
+        heading: 'Análisis de tendencia',
+        body: [
+          'La siguiente recta muestra el progreso semanal cuando se incrementan los ejercicios correctos en 3 por sesión.',
+        ],
+        visualization: {
+          type: 'plotly',
+          data: [
+            {
+              x: [0, 1, 2, 3, 4],
+              y: [2, 5, 8, 11, 14],
+              type: 'scatter',
+              mode: 'lines+markers',
+              name: 'y = 3x + 2',
+              marker: { color: '#38ef7d' },
+            },
+          ],
+          layout: {
+            title: 'Progreso lineal',
+            xaxis: { title: 'Sesiones' },
+            yaxis: { title: 'Ejercicios correctos' },
+          },
+        },
+      },
+    ],
+    checkpoint: {
+      questions: [
+        {
+          id: 'm3-q1',
+          stem: 'Resuelve $3x - 5 = 10$.',
+          options: [
+            { key: 'A', label: 'x = 3' },
+            { key: 'B', label: 'x = 4' },
+            { key: 'C', label: 'x = 5' },
+            { key: 'D', label: 'x = 6' },
+          ],
+          correct: 'D',
+        },
+        {
+          id: 'm3-q2',
+          stem: 'Una recta pasa por $(0, 1)$ y tiene pendiente 2. ¿Cuál es su ecuación?',
+          options: [
+            { key: 'A', label: 'y = 2x + 1' },
+            { key: 'B', label: 'y = x + 2' },
+            { key: 'C', label: 'y = 2x - 1' },
+            { key: 'D', label: 'y = -2x + 1' },
+          ],
+          correct: 'A',
+        },
+      ],
+    },
+  },
+];
+
+const buildStaticModule = (moduleIndex: number, reason: 'control' | 'fallback', payload?: TheoryModuleRequest) => {
+  const blueprint = STATIC_MODULE_LIBRARY[moduleIndex % STATIC_MODULE_LIBRARY.length];
+  const clone = JSON.parse(JSON.stringify(blueprint)) as StaticModuleBlueprint;
+
+  const learnerGoal = payload?.participantProfile?.goal;
+  if (learnerGoal && clone.sections.length > 0) {
+    clone.sections[0]!.body = [
+      ...(clone.sections[0]!.body ?? []),
+      { callout: `Recuerda tu meta personal: ${learnerGoal}. Ajusta el ritmo para alcanzarla.` },
+    ];
+  }
+
+  const baseDescription = clone.description;
+  const descriptionSuffix =
+    reason === 'control'
+      ? ' Material autoguiado con ejemplos resueltos.'
+      : ' Contenido disponible mientras restablecemos el tutor IA.';
+
+  return {
+    moduleId: `${reason}-${moduleIndex}`,
+    version: reason === 'control' ? 'control-v1' : 'fallback',
+    title: clone.title,
+    description: `${baseDescription}${descriptionSuffix}`,
+    sections: clone.sections,
+    checkpoint: clone.checkpoint,
+  };
+};
+
 interface GenerateTheoryPayload {
   moduleIndex: number;
 }
@@ -92,6 +363,11 @@ export const generateTheoryModule = async (userId: number, payload: GenerateTheo
   const pretest = userProfile.assessments[0] ?? null;
   const survey = userProfile.surveys[0] ?? null;
 
+  const featureFlag = await prisma.featureFlag.findUnique({
+    where: { user_id: userId },
+  });
+  const adaptativoEnabled = featureFlag?.adaptativo ?? false;
+
   const requestPayload = {
     participantProfile: {
       age: userProfile.age,
@@ -116,14 +392,18 @@ export const generateTheoryModule = async (userId: number, payload: GenerateTheo
 
   let generated;
 
-  try {
-    logTheory('requesting theory module from AI', { userId, moduleIndex });
-    const response = await axios.post(`${AI_SERVICE_URL}/generate/theory-module`, requestPayload);
-    generated = response.data;
-    logTheory('received theory module from AI', { userId, moduleIndex, hasSections: Array.isArray(generated?.sections) });
-  } catch (error) {
-    console.error('[theory] AI generation failed, using fallback', { userId, moduleIndex, error: (error as Error).message });
-    generated = createFallbackModule(requestPayload);
+  if (!adaptativoEnabled) {
+    generated = buildStaticModule(moduleIndex, 'control', requestPayload);
+  } else {
+    try {
+      logTheory('requesting theory module from AI', { userId, moduleIndex });
+      const response = await axios.post(`${AI_SERVICE_URL}/generate/theory-module`, requestPayload);
+      generated = response.data;
+      logTheory('received theory module from AI', { userId, moduleIndex, hasSections: Array.isArray(generated?.sections) });
+    } catch (error) {
+      console.error('[theory] AI generation failed, using fallback', { userId, moduleIndex, error: (error as Error).message });
+      generated = createFallbackModule(requestPayload);
+    }
   }
 
   if (!generated || typeof generated !== 'object') {
@@ -371,66 +651,4 @@ export const getStudyStatus = async (userId: number) => {
   };
 };
 
-const createFallbackModule = (payload: any) => {
-  const moduleIndex = payload?.moduleIndex ?? 0;
-  const level = payload?.participantProfile?.mathLevel ?? 'intermediate';
-  const title = `Módulo ${moduleIndex + 1}: Fundamentos ${level === 'beginner' ? 'básicos' : level === 'advanced' ? 'avanzados' : 'intermedios'}`;
-
-  return {
-    moduleId: `fallback-${moduleIndex}`,
-    version: 'fallback',
-    title,
-    description: 'Contenido generado localmente por falta de conexión con el servicio IA.',
-    sections: [
-      {
-        heading: 'Recordatorio conceptual',
-        body: [
-          'Repasa las operaciones fundamentales y asegúrate de dominar las propiedades antes de avanzar.',
-          {
-            math: 'a^2 + b^2 = c^2',
-          },
-        ],
-      },
-      {
-        heading: 'Ejemplo trabajado',
-        body: [
-          'Considera la ecuación $\\frac{3}{4}x + 2 = 5$. Resuelve despejando la incógnita.',
-        ],
-      },
-      {
-        visualization: {
-          type: 'plotly',
-          data: [
-            {
-              x: [0, 1, 2, 3, 4],
-              y: [0, 1, 4, 9, 16],
-              type: 'scatter',
-              mode: 'lines+markers',
-              name: 'y = x^2',
-            },
-          ],
-          layout: {
-            title: 'Función cuadrática',
-            xaxis: { title: 'x' },
-            yaxis: { title: 'y' },
-          },
-        },
-      },
-    ],
-    checkpoint: {
-      questions: [
-        {
-          id: 'q1',
-          stem: 'Resuelve la ecuación $2x + 6 = 14$. ¿Cuál es el valor de $x$?',
-          options: [
-            { key: 'A', label: '2' },
-            { key: 'B', label: '3' },
-            { key: 'C', label: '4' },
-            { key: 'D', label: '5' },
-          ],
-          correct: 'C',
-        },
-      ],
-    },
-  };
-};
+const createFallbackModule = (payload: any) => buildStaticModule(payload?.moduleIndex ?? 0, 'fallback', payload);

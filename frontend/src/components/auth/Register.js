@@ -18,6 +18,7 @@ const Register = () => {
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -31,7 +32,7 @@ const Register = () => {
 
     
 
-    const recaptchaToken = recaptchaRef.current.getValue();
+    const recaptchaToken = recaptchaRef.current?.getValue?.();
     if (!recaptchaToken) {
       setError("Completa el reCAPTCHA antes de continuar.");
       setLoading(false);
@@ -51,9 +52,14 @@ const Register = () => {
         goal: formData.math_goals, // Map math_goals to goal for backend
         recaptchaToken 
       });
-      alert("Cuenta creada con éxito. Inicia sesión para continuar.");
-      navigate("/");
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
+      }
+      setShowSuccessModal(true);
     } catch (err) {
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
+      }
       setError("No pudimos crear tu cuenta. Revisa los datos e inténtalo nuevamente.");
       console.error(err);
     } finally {
@@ -125,6 +131,26 @@ const Register = () => {
           </form>
         </div>
       </main>
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
+          <div className="w-full max-w-md rounded-3xl border border-[#2a3a33] bg-[#0f1713] p-8 text-center shadow-2xl">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary-color)]/15 text-[var(--primary-color)]">
+              <span className="material-symbols-outlined text-3xl">check_circle</span>
+            </div>
+            <h2 className="mt-6 text-2xl font-semibold text-white">Cuenta creada</h2>
+            <p className="mt-3 text-sm text-[#9eb7a8]">
+              Guardamos tus datos de acceso. Inicia sesión para continuar con el estudio.
+            </p>
+            <button
+              type="button"
+              className="mt-8 inline-flex h-11 items-center justify-center rounded-full bg-[var(--primary-color)] px-8 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90"
+              onClick={() => navigate('/')}
+            >
+              Ir al inicio de sesión
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,8 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, updateProfile } from '../services/api';
 import PasswordChange from './auth/PasswordChange';
+import LoadingSpinner from './common/LoadingSpinner';
 
 const fieldLabel = {
   first_name: 'Nombre',
@@ -18,8 +18,13 @@ const Profile = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileNotice, setProfileNotice] = useState(null);
+  const [profileError, setProfileError] = useState(null);
+  const [passwordNotice, setPasswordNotice] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,32 +55,23 @@ const Profile = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setLoading(true);
-    setError(null);
-
+    setSavingProfile(true);
+    setProfileError(null);
     try {
       const response = await updateProfile(formData);
       setUser(response.data);
-      setIsEditing(false);
+      setProfileNotice('Guardamos tu información.');
+      setShowEditModal(false);
     } catch (err) {
       console.error(err);
-      setError('No pudimos actualizar tus datos.');
+      setProfileError('No pudimos actualizar tus datos.');
     } finally {
-      setLoading(false);
+      setSavingProfile(false);
     }
   };
 
-  const handleCancelEdit = () => {
-    setFormData(user);
-    setIsEditing(false);
-  };
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0b1210] text-white flex items-center justify-center">
-        <p className="text-sm text-[#9eb7a8]">Cargando perfil…</p>
-      </div>
-    );
+    return <LoadingSpinner label="Cargando perfil…" fullscreen subdued />;
   }
 
   if (error) {
@@ -114,18 +110,48 @@ const Profile = () => {
 
       <main className="px-6 md:px-10 py-10">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+          {(profileNotice || profileError || passwordNotice) && (
+            <div
+              className={`rounded-3xl border px-4 py-3 text-sm ${
+                profileError
+                  ? 'border-red-500/40 bg-red-500/10 text-red-200'
+                  : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+              }`}
+            >
+              {profileError || profileNotice || passwordNotice}
+            </div>
+          )}
+
           <section className="rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
             <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Información general</p>
-                <h2 className="text-2xl font-bold">{user.first_name ? `Hola, ${user.first_name}` : 'Tu perfil'}</h2>
+                <h2 className="text-2xl font-bold">
+                  {user.first_name ? `Hola, ${user.first_name}` : 'Tu perfil'}
+                </h2>
               </div>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90"
-              >
-                Editar datos
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => {
+                    setFormData(user);
+                    setProfileError(null);
+                    setProfileNotice(null);
+                    setShowEditModal(true);
+                  }}
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90"
+                >
+                  Editar datos
+                </button>
+                <button
+                  onClick={() => {
+                    setPasswordNotice(null);
+                    setShowPasswordModal(true);
+                  }}
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-[#203028] px-6 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Cambiar contraseña
+                </button>
+              </div>
             </header>
 
             <dl className="mt-6 grid gap-4 md:grid-cols-2">
@@ -139,97 +165,129 @@ const Profile = () => {
               ))}
             </dl>
           </section>
-
-          {isEditing && (
-            <section className="rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
-              <header className="mb-6 space-y-1">
-                <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Editar</p>
-                <h2 className="text-xl font-semibold">Actualizar información personal</h2>
-              </header>
-              <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#cbe0d7]">Nombre</span>
-                  <input
-                    type="text"
-                    name="first_name"
-                    value={formData.first_name || ''}
-                    onChange={handleChange}
-                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#cbe0d7]">Apellido</span>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={formData.last_name || ''}
-                    onChange={handleChange}
-                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#cbe0d7]">Correo</span>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email || ''}
-                    disabled
-                    className="w-full cursor-not-allowed rounded-full border border-[#203028] bg-[#18211d] px-4 py-3 text-[#6aa58e]"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#cbe0d7]">Edad</span>
-                  <input
-                    type="number"
-                    name="age"
-                    value={formData.age || ''}
-                    onChange={handleChange}
-                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#cbe0d7]">Nivel educativo</span>
-                  <input
-                    type="text"
-                    name="education_level"
-                    value={formData.education_level || ''}
-                    onChange={handleChange}
-                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#cbe0d7]">Objetivo</span>
-                  <input
-                    type="text"
-                    name="goal"
-                    value={formData.goal || ''}
-                    onChange={handleChange}
-                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
-                  />
-                </label>
-                <div className="md:col-span-2 flex flex-wrap gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    Guardar cambios
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-[#203028] px-6 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </section>
-          )}
-
-          <PasswordChange />
         </div>
       </main>
+
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
+          <div className="w-full max-w-3xl rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Editar</p>
+                <h2 className="text-xl font-semibold text-white">Actualizar información personal</h2>
+              </div>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full border border-[#203028] text-[#cbe0d7] hover:border-[var(--primary-color)] hover:text-white"
+                onClick={() => setShowEditModal(false)}
+                aria-label="Cerrar edición"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="mt-6 grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#cbe0d7]">Nombre</span>
+                <input
+                  type="text"
+                  name="first_name"
+                  value={formData.first_name || ''}
+                  onChange={handleChange}
+                  className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#cbe0d7]">Apellido</span>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={formData.last_name || ''}
+                  onChange={handleChange}
+                  className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#cbe0d7]">Edad</span>
+                <input
+                  type="number"
+                  name="age"
+                  value={formData.age ?? ''}
+                  onChange={handleChange}
+                  className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#cbe0d7]">Nivel educativo</span>
+                <input
+                  type="text"
+                  name="education_level"
+                  value={formData.education_level || ''}
+                  onChange={handleChange}
+                  className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                />
+              </label>
+              <label className="md:col-span-2 space-y-2">
+                <span className="text-sm font-medium text-[#cbe0d7]">Objetivo</span>
+                <input
+                  type="text"
+                  name="goal"
+                  value={formData.goal || ''}
+                  onChange={handleChange}
+                  className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                />
+              </label>
+              <div className="md:col-span-2 flex flex-wrap gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {savingProfile ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-[#203028] px-6 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Cancelar
+                </button>
+              </div>
+              {profileError && (
+                <div className="md:col-span-2 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {profileError}
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
+          <div className="w-full max-w-xl rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Seguridad</p>
+                <h2 className="text-xl font-semibold text-white">Actualizar contraseña</h2>
+              </div>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full border border-[#203028] text-[#cbe0d7] hover:border-[var(--primary-color)] hover:text-white"
+                onClick={() => setShowPasswordModal(false)}
+                aria-label="Cerrar actualización de contraseña"
+              >
+                ×
+              </button>
+            </div>
+            <PasswordChange
+              onSuccess={() => {
+                setPasswordNotice('Actualizamos tu contraseña.');
+                setShowPasswordModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

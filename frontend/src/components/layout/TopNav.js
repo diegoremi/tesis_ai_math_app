@@ -43,10 +43,6 @@ const TopNav = ({ showAdminShortcut = false }) => {
         >
           Cerrar sesión
         </button>
-        <div
-          className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-white/20"
-          style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDzwqLre8NBwpSwWzEzNrd--HoNFug8acGIiKIVyMtJFI501kmDXZ0cI9yrTO64-GpKU0qxyEvvqfWiIj0wJ8VSYdAVNxk1-wfMeOZZcBeEmnllWifNdZZeY3IAYWR06RL2uGULQm7t55cBYtcF0v82Qq0yveuhrBrOGqnOhmQ6WChCnNlHAiuC209fA3hwoHEb4fKw7XY-oGrvbtRBFxckR9uIkCXJST9X6OcfJoV4UkfLf2Lbk5fthTq7-XWYsJObBLC1PTJ6U")' }}
-        ></div>
       </div>
 
       <button

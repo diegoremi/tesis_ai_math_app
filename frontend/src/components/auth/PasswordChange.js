@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { updatePassword } from '../../services/api';
 
-const PasswordChange = () => {
+const PasswordChange = ({ onSuccess }) => {
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -34,6 +34,9 @@ const PasswordChange = () => {
       });
       setSuccess('Actualizamos tu contraseña.');
       setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       console.error(err);
       setError('No pudimos actualizarla. Revisa los datos e intenta nuevamente.');

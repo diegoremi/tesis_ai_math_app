@@ -13,6 +13,7 @@ export interface RandomizePayload {
 }
 
 const DEFAULT_METHOD = 'azar';
+const AUTO_ASSIGN_SEED = 'auto_round_robin';
 
 function createRandom(seed?: string) {
   if (!seed) {
@@ -49,6 +50,50 @@ function shuffleWithSeed<T>(items: T[], seed?: string) {
   }
   return arr;
 }
+
+export const autoAssignParticipant = async (userId: number) => {
+  const existingAssignment = await prisma.assignment.findFirst({
+    where: { user_id: userId },
+  });
+  if (existingAssignment) {
+    return existingAssignment;
+  }
+
+  const [geCount, gcCount] = await Promise.all([
+    prisma.assignment.count({ where: { group: AssignmentGroup.GE } }),
+    prisma.assignment.count({ where: { group: AssignmentGroup.GC } }),
+  ]);
+
+  const nextGroup = geCount <= gcCount ? AssignmentGroup.GE : AssignmentGroup.GC;
+
+  const assignment = await prisma.$transaction(async (tx) => {
+    const createdAssignment = await tx.assignment.create({
+      data: {
+        user_id: userId,
+        group: nextGroup,
+        method: AssignmentMethod.azar,
+        seed: AUTO_ASSIGN_SEED,
+      },
+    });
+
+    await tx.featureFlag.upsert({
+      where: { user_id: userId },
+      update: {
+        chatbot: nextGroup === AssignmentGroup.GE,
+        adaptativo: nextGroup === AssignmentGroup.GE,
+      },
+      create: {
+        user_id: userId,
+        chatbot: nextGroup === AssignmentGroup.GE,
+        adaptativo: nextGroup === AssignmentGroup.GE,
+      },
+    });
+
+    return createdAssignment;
+  });
+
+  return assignment;
+};
 
 export const recordConsent = async (userId: number, payload: ConsentPayload) => {
   const { documentVersion, accepted } = payload;

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Plot from 'react-plotly.js';
 import { BlockMath, InlineMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
@@ -15,6 +15,89 @@ const clamp = (value) => {
   if (value < 0) return 0;
   if (value > 1) return 1;
   return value;
+};
+
+const MATH_TOKEN_REGEX = /(\$\$[^$]+\$\$|\$[^$]+\$)/g;
+
+const splitMathSegments = (value) => {
+  const text = String(value ?? '');
+  return text
+    .split(MATH_TOKEN_REGEX)
+    .filter(Boolean)
+    .map((segment) => {
+      const trimmed = segment.trim();
+      if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
+        return { type: 'block', math: trimmed.slice(2, -2).trim() };
+      }
+      if (trimmed.startsWith('$') && trimmed.endsWith('$')) {
+        return { type: 'inline', math: trimmed.slice(1, -1).trim() };
+      }
+      return { type: 'text', text: segment };
+    });
+};
+
+const renderRichText = (value, keyPrefix, paragraphClass = 'text-sm text-[#cbe0d7] leading-relaxed') => {
+  const segments = splitMathSegments(value);
+  const nodes = [];
+  let inlineBuffer = [];
+
+  const flushBuffer = () => {
+    if (!inlineBuffer.length) {
+      return;
+    }
+    nodes.push(
+      <p key={`${keyPrefix}-p-${nodes.length}`} className={paragraphClass}>
+        {inlineBuffer.map((segment, index) => {
+          if (segment.type === 'inline') {
+            return <InlineMath key={`${keyPrefix}-inline-${index}`} math={segment.math} />;
+          }
+          return <Fragment key={`${keyPrefix}-text-${index}`}>{segment.text}</Fragment>;
+        })}
+      </p>,
+    );
+    inlineBuffer = [];
+  };
+
+  segments.forEach((segment, index) => {
+    if (segment.type === 'block') {
+      flushBuffer();
+      nodes.push(
+        <div key={`${keyPrefix}-block-${index}`} className="my-3">
+          <BlockMath math={segment.math} />
+        </div>,
+      );
+      return;
+    }
+    inlineBuffer.push(segment);
+  });
+
+  flushBuffer();
+
+  if (!nodes.length) {
+    return [
+      <p key={`${keyPrefix}-p-0`} className={paragraphClass}>
+        {value}
+      </p>,
+    ];
+  }
+
+  return nodes;
+};
+
+const renderInlineRichText = (value, keyPrefix) => {
+  return splitMathSegments(value).map((segment, index) => {
+    if (segment.type === 'block') {
+      return (
+        <span key={`${keyPrefix}-block-${index}`} className="block my-2">
+          <BlockMath math={segment.math} />
+        </span>
+      );
+    }
+    if (segment.type === 'inline') {
+      return <InlineMath key={`${keyPrefix}-inline-${index}`} math={segment.math} />;
+    }
+    return <Fragment key={`${keyPrefix}-text-${index}`}>{segment.text}</Fragment>;
+  });
 };
 
 const Theory = () => {
@@ -248,9 +331,9 @@ const Theory = () => {
   const renderBodyBlock = (block, key) => {
     if (typeof block === 'string') {
       return (
-        <p key={key} className="text-sm text-[#cbe0d7] leading-relaxed">
-          {block}
-        </p>
+        <Fragment key={key}>
+          {renderRichText(block, `${key}-text`)}
+        </Fragment>
       );
     }
     if (!block || typeof block !== 'object') {
@@ -394,7 +477,13 @@ const Theory = () => {
                       </div>
                       {checkpoint.questions.map((question, index) => (
                         <div key={question.id ?? index} className="space-y-3 rounded-xl border border-[#1f2b26] bg-[#14201c] p-4">
-                          <p className="text-sm font-medium text-white">{question.stem}</p>
+                          <div className="space-y-2 text-sm font-medium text-white">
+                            {renderRichText(
+                              question.stem,
+                              `${question.id ?? index}-stem`,
+                              'text-sm font-medium text-white leading-relaxed',
+                            )}
+                          </div>
                           <div className="grid gap-2">
                             {(question.options ?? []).map((option) => (
                               <label
@@ -414,7 +503,9 @@ const Theory = () => {
                                   className="hidden"
                                 />
                                 <span className="font-semibold text-[#9eb7a8]">{option.key}</span>
-                                <span>{option.label}</span>
+                                <span className="text-left text-sm font-medium text-white">
+                                  {renderInlineRichText(option.label ?? option.text ?? '', `${question.id ?? index}-option-${option.key}`)}
+                                </span>
                               </label>
                             ))}
                           </div>

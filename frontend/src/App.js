@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
+import LoadingSpinner from './components/common/LoadingSpinner';
 import Login from './components/auth/Login';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
@@ -25,7 +26,7 @@ const ProtectedRoute = ({ children, skipPretestCheck = false, requirePosttestUnl
     !studyStatus.loaded;
 
   if (prerequisitesLoading) {
-    return <div>Cargando autenticación...</div>;
+    return <LoadingSpinner label="Cargando autenticación…" fullscreen />;
   }
 
   if (!isAuthenticated) {

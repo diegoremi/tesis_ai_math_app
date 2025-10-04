@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import {
@@ -8,8 +8,15 @@ import {
   exportData,
   randomizeParticipants,
   getRandomizationSummary,
+  updateUserFeatureFlags,
+  fetchAdminReport,
 } from '../services/api';
-import './AdminDashboard.css';
+import TopNav from './layout/TopNav';
+import LoadingSpinner from './common/LoadingSpinner';
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -25,6 +32,8 @@ const AdminDashboard = () => {
   const [randomizeLoading, setRandomizeLoading] = useState(false);
   const [randomizeMessage, setRandomizeMessage] = useState(null);
   const [randomizeError, setRandomizeError] = useState(null);
+  const [flagNotice, setFlagNotice] = useState(null);
+  const [flagError, setFlagError] = useState(null);
 
   const fetchRandomizationSummary = useCallback(async () => {
     if (!user || user.role !== 'admin') {
@@ -87,6 +96,23 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDownloadReport = async () => {
+    try {
+      const response = await fetchAdminReport();
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `reporte-${new Date().toISOString()}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Error downloading report:', err);
+      setError('No pudimos descargar el reporte completo.');
+    }
+  };
+
   const handleRandomize = async (event) => {
     event.preventDefault();
     setRandomizeLoading(true);
@@ -113,147 +139,474 @@ const AdminDashboard = () => {
     }
   };
 
-  if (loading) {
-    return <div>Loading Admin Dashboard...</div>;
-  }
+  const handleToggleFlag = async (userId, payload) => {
+    setFlagNotice(null);
+    setFlagError(null);
+    try {
+      const response = await updateUserFeatureFlags(userId, payload);
+      const updatedFlag = response.data?.featureFlag ?? null;
+      const updatedGroup = response.data?.assignment ?? null;
 
-  if (error) {
-    return <div>Error: {error}</div>;
+      setUsers((prev) =>
+        prev.map((candidate) => {
+          if (candidate.user_id !== userId) {
+            return candidate;
+          }
+          const nextAssignments = updatedGroup
+            ? [{ ...(candidate.assignments?.[0] ?? {}), group: updatedGroup }]
+            : candidate.assignments;
+          return {
+            ...candidate,
+            featureFlag: updatedFlag,
+            assignments: nextAssignments,
+          };
+        }),
+      );
+
+      await fetchRandomizationSummary();
+      setFlagNotice('Actualizamos las opciones de tutoría.');
+    } catch (err) {
+      console.error('Error updating feature flags:', err);
+      setFlagError('No pudimos actualizar los flags del usuario.');
+    }
+  };
+
+  const summaryCards = useMemo(() => ([
+    {
+      label: 'Usuarios registrados',
+      value: users.length,
+      tone: 'primary',
+    },
+    {
+      label: 'Actividades registradas',
+      value: activities.length,
+      tone: 'neutral',
+    },
+    {
+      label: 'Evaluaciones cargadas',
+      value: assessments.length,
+      tone: 'neutral',
+    },
+  ]), [users.length, activities.length, assessments.length]);
+
+  const performanceChart = useMemo(() => {
+    if (!assessments.length) {
+      return null;
+    }
+
+    const groupMap = new Map();
+    users.forEach((participant) => {
+      const group = participant.assignments?.[0]?.group ?? 'Sin grupo';
+      groupMap.set(participant.user_id, group);
+    });
+
+    const accumulator = new Map();
+    assessments.forEach((assessment) => {
+      if (assessment.total_score == null) {
+        return;
+      }
+      const group = groupMap.get(assessment.user_id) ?? 'Sin grupo';
+      const bucket = accumulator.get(group) ?? { pre: [], post: [] };
+      if (assessment.assessment_type === 'pretest') {
+        bucket.pre.push(assessment.total_score);
+      } else if (assessment.assessment_type === 'posttest') {
+        bucket.post.push(assessment.total_score);
+      }
+      accumulator.set(group, bucket);
+    });
+
+    const labels = Array.from(accumulator.keys());
+    if (!labels.length) {
+      return null;
+    }
+
+    const average = (values) => (values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : 0);
+
+    const data = {
+      labels,
+      datasets: [
+        {
+          label: 'Pretest',
+          data: labels.map((label) => average(accumulator.get(label)?.pre ?? [])),
+          backgroundColor: '#4acbb2',
+          borderRadius: 6,
+        },
+        {
+          label: 'Postest',
+          data: labels.map((label) => average(accumulator.get(label)?.post ?? [])),
+          backgroundColor: '#38ef7d',
+          borderRadius: 6,
+        },
+      ],
+    };
+
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#cbe0d7',
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#9eb7a8' },
+          grid: { color: '#1f2c26' },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#9eb7a8' },
+          grid: { color: '#1f2c26' },
+        },
+      },
+    };
+
+    return { data, options };
+  }, [assessments, users]);
+
+  if (loading) {
+    return <LoadingSpinner label="Preparando panel administrativo…" fullscreen subdued />;
   }
 
   return (
-    <div className="admin-dashboard-container">
-      <h2>Panel de administración</h2>
-      <div className="admin-dashboard-section">
-        <h3>Personas registradas</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Correo</th>
-              <th>Rol</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.user_id}>
-                <td>{u.user_id}</td>
-                <td>{u.first_name} {u.last_name}</td>
-                <td>{u.email}</td>
-                <td>{u.role}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="admin-dashboard-section">
-        <h3>Actividades</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>ID usuario</th>
-              <th>Tipo</th>
-              <th>Dificultad</th>
-              <th>Intentos</th>
-              <th>Aciertos</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activities.map(a => (
-              <tr key={a.activity_id}>
-                <td>{a.activity_id}</td>
-                <td>{a.user_id}</td>
-                <td>{a.activity_type}</td>
-                <td>{a.difficulty_level}</td>
-                <td>{a.attempts}</td>
-                <td>{a.correct_answers}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="admin-dashboard-section">
-        <h3>Evaluaciones</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>ID usuario</th>
-              <th>Tipo</th>
-              <th>Puntaje</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assessments.map(ass => (
-              <tr key={ass.assessment_id}>
-                <td>{ass.assessment_id}</td>
-                <td>{ass.user_id}</td>
-                <td>{ass.assessment_type}</td>
-                <td>{ass.total_score}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="admin-dashboard-section">
-        <h3>Exportar datos</h3>
-        <button onClick={() => handleExport('users')}>Descargar usuarios (CSV)</button>
-        <button onClick={() => handleExport('activities')}>Descargar actividades (CSV)</button>
-        <button onClick={() => handleExport('assessments')}>Descargar evaluaciones (CSV)</button>
-      </div>
-
-      {user?.role === 'admin' && (
-        <div className="admin-dashboard-section">
-          <h3>Asignación de grupos</h3>
-          {randomizationSummary ? (
-            <div className="randomization-summary">
-              <p>Participantes totales: {randomizationSummary.totalParticipants}</p>
-              <p>
-                Asignados — GE: {randomizationSummary.assigned?.GE ?? 0}, GC: {randomizationSummary.assigned?.GC ?? 0}
-              </p>
-              <p>Pendientes de asignar: {randomizationSummary.unassigned}</p>
-              {randomizationSummary.lastRun && (
-                <p>
-                  Última ejecución: {new Date(randomizationSummary.lastRun.assigned_at).toLocaleString()} (método: {randomizationSummary.lastRun.method}
-                  {randomizationSummary.lastRun.seed ? `, semilla: ${randomizationSummary.lastRun.seed}` : ''})
-                </p>
-              )}
+    <div
+      className="relative min-h-screen bg-[#0b1210] text-white"
+      style={{ fontFamily: '"Spline Sans", "Noto Sans", sans-serif' }}
+    >
+      <TopNav />
+      <main className="px-6 md:px-10 py-10">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+          <header className="space-y-3">
+            <p className="text-xs uppercase tracking-[0.35em] text-[#6aa58e]">Administración</p>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h1 className="text-3xl font-bold tracking-tight">Panel de investigación</h1>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleExport('users')}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#203028] px-5 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Exportar usuarios
+                  <span className="material-symbols-outlined text-base">download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('activities')}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#203028] px-5 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Exportar actividades
+                  <span className="material-symbols-outlined text-base">download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('assessments')}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#203028] px-5 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Exportar evaluaciones
+                  <span className="material-symbols-outlined text-base">download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#203028] px-5 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Reporte completo
+                  <span className="material-symbols-outlined text-base">analytics</span>
+                </button>
+              </div>
             </div>
-          ) : (
-        <p>Todavía no se ejecutó ninguna asignación.</p>
+            {error && (
+              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+          </header>
+
+          <section className="grid gap-4 md:grid-cols-3">
+            {summaryCards.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-2xl border border-[#203028] bg-[#101a17] p-6 shadow-lg"
+              >
+                <p className="text-xs uppercase tracking-[0.3em] text-[#6aa58e]">{card.label}</p>
+                <p className="mt-4 text-3xl font-bold text-white">{card.value}</p>
+              </div>
+            ))}
+          </section>
+
+          {performanceChart && (
+            <section className="rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+              <header className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Rendimiento por grupo</h2>
+                  <p className="text-sm text-[#94b1a3]">Promedios de pretest y postest según la cohorte asignada.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleExport('ancova')}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#203028] px-5 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
+                >
+                  Descargar dataset ANCOVA
+                  <span className="material-symbols-outlined text-base">download</span>
+                </button>
+              </header>
+              <div className="h-72">
+                <Bar data={performanceChart.data} options={performanceChart.options} />
+              </div>
+            </section>
           )}
-          <form className="randomization-form" onSubmit={handleRandomize}>
-            <div className="randomization-controls">
-              <label>
-                Método
-                <select value={randomizeMethod} onChange={(e) => setRandomizeMethod(e.target.value)}>
-                  <option value="azar">Azar (balance automático)</option>
-                  <option value="emparejamiento">Emparejamiento manual</option>
-                </select>
-              </label>
-              <label>
-                Semilla (opcional)
-                <input
-                  type="text"
-                  value={randomizeSeed}
-                  onChange={(e) => setRandomizeSeed(e.target.value)}
-                  placeholder="e.g. study-week-01"
-                />
-              </label>
-              <button type="submit" disabled={randomizeLoading}>
-                {randomizeLoading ? 'Asignando…' : 'Ejecutar asignación'}
-              </button>
+
+          <section className="space-y-4 rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+            <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Participantes registrados</h2>
+                <p className="text-sm text-[#94b1a3]">Gestiona accesos al tutor y revisa la condición experimental.</p>
+              </div>
+            </header>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[#1f2c26]">
+                <thead className="bg-[#14201c] text-xs uppercase tracking-[0.2em] text-[#6aa58e]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Nombre</th>
+                    <th className="px-4 py-3 text-left">Correo</th>
+                    <th className="px-4 py-3 text-left">Rol</th>
+                    <th className="px-4 py-3 text-left">Condición</th>
+                    <th className="px-4 py-3 text-left">Tutor IA</th>
+                    <th className="px-4 py-3 text-left">Chatbot</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f2c26] text-sm">
+                  {users.map((participant) => {
+                    const fullName = [participant.first_name, participant.last_name].filter(Boolean).join(' ') || 'Sin nombre';
+                    const group = participant.assignments?.[0]?.group;
+                    const conditionLabel = group === 'GE' ? 'Experimental (IA)' : group === 'GC' ? 'Control' : 'Pendiente';
+                    const adaptativo = Boolean(participant.featureFlag?.adaptativo);
+                    const chatbot = Boolean(participant.featureFlag?.chatbot);
+
+                    return (
+                      <tr key={participant.user_id} className="hover:bg-[#18231f]">
+                        <td className="px-4 py-3 text-white">{fullName}</td>
+                        <td className="px-4 py-3 text-[#cbe0d7]">{participant.email}</td>
+                        <td className="px-4 py-3 text-[#9eb7a8] uppercase">{participant.role}</td>
+                        <td className="px-4 py-3 text-[#cbe0d7]">{conditionLabel}</td>
+                        <td className="px-4 py-3">
+                          <label className="relative inline-flex h-6 w-11 items-center">
+                            <input
+                              type="checkbox"
+                              className="peer sr-only"
+                              checked={adaptativo}
+                              onChange={(event) => handleToggleFlag(participant.user_id, { adaptativo: event.target.checked })}
+                              aria-label={`Activar tutor IA para ${fullName}`}
+                            />
+                            <span className="absolute h-6 w-11 rounded-full bg-[#1f2b26] transition peer-checked:bg-[var(--primary-color)]" />
+                            <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5" />
+                          </label>
+                        </td>
+                        <td className="px-4 py-3">
+                          <label className="relative inline-flex h-6 w-11 items-center">
+                            <input
+                              type="checkbox"
+                              className="peer sr-only"
+                              checked={chatbot}
+                              onChange={(event) => handleToggleFlag(participant.user_id, { chatbot: event.target.checked })}
+                              aria-label={`Activar chatbot para ${fullName}`}
+                            />
+                            <span className="absolute h-6 w-11 rounded-full bg-[#1f2b26] transition peer-checked:bg-[var(--primary-color)]" />
+                            <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5" />
+                          </label>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!users.length && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-sm text-[#6aa58e]">
+                        No hay usuarios registrados aún.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </form>
-          {randomizeMessage && <p className="success-message">{randomizeMessage}</p>}
-          {randomizeError && <p className="error-message">{randomizeError}</p>}
+            {(flagNotice || flagError) && (
+              <div
+                className={`rounded-2xl px-4 py-3 text-sm ${
+                  flagError
+                    ? 'border border-red-500/40 bg-red-500/10 text-red-200'
+                    : 'border border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                }`}
+              >
+                {flagError || flagNotice}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4 rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+            <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Actividades registradas</h2>
+                <p className="text-sm text-[#94b1a3]">Intentos de práctica y métricas agregadas.</p>
+              </div>
+            </header>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[#1f2c26]">
+                <thead className="bg-[#14201c] text-xs uppercase tracking-[0.2em] text-[#6aa58e]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">ID</th>
+                    <th className="px-4 py-3 text-left">Usuario</th>
+                    <th className="px-4 py-3 text-left">Tipo</th>
+                    <th className="px-4 py-3 text-left">Dificultad</th>
+                    <th className="px-4 py-3 text-left">Intentos</th>
+                    <th className="px-4 py-3 text-left">Aciertos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f2c26] text-sm">
+                  {activities.map((activity) => (
+                    <tr key={activity.activity_id} className="hover:bg-[#18231f]">
+                      <td className="px-4 py-3 text-[#9eb7a8]">{activity.activity_id}</td>
+                      <td className="px-4 py-3 text-[#cbe0d7]">{activity.user_id}</td>
+                      <td className="px-4 py-3 text-white">{activity.activity_type}</td>
+                      <td className="px-4 py-3 text-[#9eb7a8]">{activity.difficulty_level}</td>
+                      <td className="px-4 py-3 text-[#cbe0d7]">{activity.attempts}</td>
+                      <td className="px-4 py-3 text-[#cbe0d7]">{activity.correct_answers}</td>
+                    </tr>
+                  ))}
+                  {!activities.length && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-sm text-[#6aa58e]">
+                        Todavía no se registran actividades.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="space-y-4 rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+            <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Evaluaciones</h2>
+                <p className="text-sm text-[#94b1a3]">Últimos pretest y postest registrados.</p>
+              </div>
+            </header>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[#1f2c26]">
+                <thead className="bg-[#14201c] text-xs uppercase tracking-[0.2em] text-[#6aa58e]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">ID</th>
+                    <th className="px-4 py-3 text-left">Usuario</th>
+                    <th className="px-4 py-3 text-left">Tipo</th>
+                    <th className="px-4 py-3 text-left">Puntaje</th>
+                    <th className="px-4 py-3 text-left">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f2c26] text-sm">
+                  {assessments.map((assessment) => (
+                    <tr key={assessment.assessment_id} className="hover:bg-[#18231f]">
+                      <td className="px-4 py-3 text-[#9eb7a8]">{assessment.assessment_id}</td>
+                      <td className="px-4 py-3 text-[#cbe0d7]">{assessment.user_id}</td>
+                      <td className="px-4 py-3 text-white">{assessment.assessment_type}</td>
+                      <td className="px-4 py-3 text-[#cbe0d7]">{assessment.total_score ?? '—'}</td>
+                      <td className="px-4 py-3 text-[#9eb7a8]">
+                        {assessment.created_at ? new Date(assessment.created_at).toLocaleDateString() : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {!assessments.length && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-[#6aa58e]">
+                        Todavía no se registran evaluaciones.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {user?.role === 'admin' && (
+            <section className="space-y-6 rounded-3xl border border-[#203028] bg-[#101a17] p-6 md:p-8 shadow-lg">
+              <header className="space-y-2">
+                <h2 className="text-xl font-semibold text-white">Asignación experimental</h2>
+                <p className="text-sm text-[#94b1a3]">Randomizá a los participantes entre GE y GC con balance supervisado.</p>
+              </header>
+
+              {randomizationSummary ? (
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl border border-[#1f2b26] bg-[#14201c] px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Totales</p>
+                    <p className="mt-2 text-2xl font-bold">{randomizationSummary.totalParticipants}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#1f2b26] bg-[#14201c] px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Asignados</p>
+                    <p className="mt-2 text-sm text-[#cbe0d7]">GE: {randomizationSummary.assigned?.GE ?? 0} · GC: {randomizationSummary.assigned?.GC ?? 0}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#1f2b26] bg-[#14201c] px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.25em] text-[#6aa58e]">Pendientes</p>
+                    <p className="mt-2 text-2xl font-bold">{randomizationSummary.unassigned}</p>
+                    {randomizationSummary.lastRun && (
+                      <p className="mt-2 text-xs text-[#94b1a3]">
+                        Última ejecución: {new Date(randomizationSummary.lastRun.assigned_at).toLocaleString('es-AR', { hour12: false })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-[#1f2b26] bg-[#14201c] px-4 py-3 text-sm text-[#6aa58e]">
+                  Todavía no se ejecutó ninguna asignación.
+                </div>
+              )}
+
+              <form onSubmit={handleRandomize} className="grid gap-4 md:grid-cols-3">
+                <label className="space-y-2 text-sm text-[#cbe0d7]">
+                  Método
+                  <select
+                    value={randomizeMethod}
+                    onChange={(event) => setRandomizeMethod(event.target.value)}
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  >
+                    <option value="azar">Azar (balance automático)</option>
+                    <option value="emparejamiento">Emparejamiento manual</option>
+                  </select>
+                </label>
+                <label className="space-y-2 text-sm text-[#cbe0d7]">
+                  Semilla (opcional)
+                  <input
+                    type="text"
+                    value={randomizeSeed}
+                    onChange={(event) => setRandomizeSeed(event.target.value)}
+                    placeholder="ej. semana-01"
+                    className="w-full rounded-full border border-[#203028] bg-[#0d1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-[var(--primary-color)] focus:outline-none focus:ring-[var(--primary-color)]"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={randomizeLoading}
+                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--primary-color)] px-6 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90 disabled:opacity-60"
+                  >
+                    {randomizeLoading ? 'Asignando…' : 'Ejecutar asignación'}
+                  </button>
+                </div>
+              </form>
+
+              {randomizeMessage && (
+                <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                  {randomizeMessage}
+                </div>
+              )}
+              {randomizeError && (
+                <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {randomizeError}
+                </div>
+              )}
+            </section>
+          )}
         </div>
-      )}
+      </main>
     </div>
   );
 };

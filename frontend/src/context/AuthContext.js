@@ -1,5 +1,6 @@
 
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -193,7 +194,7 @@ export const AuthProvider = ({ children }) => {
   }, [setDefaultAssessmentStatus, setDefaultStudyStatus]);
 
   if (loading) {
-    return <div>Cargando autenticación...</div>;
+    return <LoadingSpinner label="Cargando autenticación…" fullscreen subdued />;
   }
 
   return (

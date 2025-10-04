@@ -130,6 +130,14 @@ export const fetchAncovaDataset = (params = {}) => {
   return apiClient.get('/admin/exports/ancova-dataset', { params });
 };
 
+export const updateUserFeatureFlags = (userId, flags) => {
+  return apiClient.patch(`/admin/users/${userId}/feature-flags`, flags);
+};
+
+export const fetchAdminReport = () => {
+  return apiClient.get('/admin/export/report');
+};
+
 export const updatePassword = (passwordData) => {
   return apiClient.put('/users/password', passwordData);
 };

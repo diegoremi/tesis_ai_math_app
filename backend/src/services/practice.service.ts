@@ -471,14 +471,22 @@ const storeGeneratedItem = async (
   });
 };
 
-const fallbackFromSeed = async (): Promise<PracticeItem> => {
-  const fallbackItem = await prisma.assessmentItem.findFirst({
+const fallbackFromSeed = async (preferredTopic?: Topic): Promise<PracticeItem> => {
+  const candidates = await prisma.assessmentItem.findMany({
     where: { test_version: "practice_v1" },
     orderBy: { item_id: "asc" },
   });
-  if (!fallbackItem) {
+
+  if (!candidates.length) {
     throw new Error("No hay ejercicios de práctica configurados");
   }
+
+  const filtered = preferredTopic
+    ? candidates.filter((item) => mapDomainToTopic(item.domain ?? null) === preferredTopic)
+    : candidates;
+
+  const pool = filtered.length ? filtered : candidates;
+  const fallbackItem = pool[Math.floor(Math.random() * pool.length)]!;
 
   const optionsArray = Array.isArray(fallbackItem.options)
     ? (fallbackItem.options as Array<Record<string, unknown>>)
@@ -501,6 +509,8 @@ const fallbackFromSeed = async (): Promise<PracticeItem> => {
     };
   });
 
+  const topic = mapDomainToTopic(fallbackItem.domain ?? null);
+
   return {
     id: `LEGACY-${fallbackItem.item_id}`,
     stem: fallbackItem.stem,
@@ -517,7 +527,7 @@ const fallbackFromSeed = async (): Promise<PracticeItem> => {
       D: "Analiza si aplicaste la operación correcta.",
     },
     meta: {
-      domain: mapDomainToTopic(fallbackItem.domain ?? null),
+      domain: topic,
       skill: "operaciones",
       estimated_time_sec: 60,
     },
@@ -530,43 +540,17 @@ export const fetchNextPracticeItem = async (userId: number) => {
     orderBy: { created_at: "asc" },
   });
 
-  if (!candidate) {
-    logPractice("no pending item, generating via LLM", { userId });
-    const context = await gatherContext(userId);
-    const sessionId = crypto.randomUUID();
-    const seed = Math.floor(Math.random() * 1_000_000_000);
-    const userPrompt = buildUserPrompt(context, sessionId, seed, 1);
+  const featureFlags = await prisma.featureFlag.findUnique({
+    where: { user_id: userId },
+  });
+  const adaptativoEnabled = featureFlags?.adaptativo ?? false;
 
-    try {
-      const raw = await callLLM(SYSTEM_PROMPT, userPrompt);
-      const parsed = JSON.parse(extractJsonString(raw));
-      if (!isPracticePayload(parsed)) {
-        throw new Error("Payload IA inválido");
-      }
-      if (!parsed.items.length) {
-        throw new Error("Payload IA sin items");
-      }
-      const item = parsed.items[0]!;
-      candidate = await storeGeneratedItem(
-        context.userId,
-        parsed.session_id,
-        parsed.topic,
-        parsed.difficulty,
-        item
-      );
-      logPractice("generated item via LLM", {
-        userId,
-        sessionId: parsed.session_id,
-        topic: parsed.topic,
-        difficulty: parsed.difficulty,
-        itemId: item.id,
-      });
-    } catch (error) {
-      console.error("[practice] LLM failure, using fallback", {
-        userId,
-        error: (error as Error).message,
-      });
-      const fallback = await fallbackFromSeed();
+  const context = await gatherContext(userId);
+  let sessionId = crypto.randomUUID();
+
+  if (!candidate) {
+    if (!adaptativoEnabled) {
+      const fallback = await fallbackFromSeed(context.topic);
       candidate = await storeGeneratedItem(
         userId,
         sessionId,
@@ -574,12 +558,61 @@ export const fetchNextPracticeItem = async (userId: number) => {
         context.difficulty,
         fallback
       );
-      logPractice("fallback item served", {
+      logPractice("serving control fallback item", {
         userId,
         sessionId,
         topic: fallback.meta.domain,
-        itemId: fallback.id,
+        difficulty: context.difficulty,
       });
+    } else {
+      logPractice("no pending item, generating via LLM", { userId });
+      const seed = Math.floor(Math.random() * 1_000_000_000);
+      const userPrompt = buildUserPrompt(context, sessionId, seed, 1);
+
+      try {
+        const raw = await callLLM(SYSTEM_PROMPT, userPrompt);
+        const parsed = JSON.parse(extractJsonString(raw));
+        if (!isPracticePayload(parsed)) {
+          throw new Error("Payload IA inválido");
+        }
+        if (!parsed.items.length) {
+          throw new Error("Payload IA sin items");
+        }
+        const item = parsed.items[0]!;
+        candidate = await storeGeneratedItem(
+          context.userId,
+          parsed.session_id,
+          parsed.topic,
+          parsed.difficulty,
+          item
+        );
+        logPractice("generated item via LLM", {
+          userId,
+          sessionId: parsed.session_id,
+          topic: parsed.topic,
+          difficulty: parsed.difficulty,
+          itemId: item.id,
+        });
+      } catch (error) {
+        console.error("[practice] LLM failure, using fallback", {
+          userId,
+          error: (error as Error).message,
+        });
+        const fallback = await fallbackFromSeed(context.topic);
+        candidate = await storeGeneratedItem(
+          userId,
+          sessionId,
+          fallback.meta.domain,
+          context.difficulty,
+          fallback
+        );
+        logPractice("fallback item served", {
+          userId,
+          sessionId,
+          topic: fallback.meta.domain,
+          itemId: fallback.id,
+        });
+      }
     }
   }
 

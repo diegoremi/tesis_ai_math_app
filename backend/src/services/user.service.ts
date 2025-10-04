@@ -1,6 +1,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { autoAssignParticipant } from './study.service.js';
 
 const prisma = new PrismaClient();
 
@@ -36,6 +37,12 @@ export const createUserService = async (userData: any) => {
       math_level,
     },
   });
+
+  try {
+    await autoAssignParticipant(newUser.user_id);
+  } catch (error) {
+    console.error('autoAssignParticipant failed', error);
+  }
 
   return newUser;
 };

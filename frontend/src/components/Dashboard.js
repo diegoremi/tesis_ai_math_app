@@ -4,6 +4,7 @@ import { useAuth } from 'context/AuthContext';
 import { getActivities, getAssessments } from '../services/api';
 import Chatbot from './Chatbot';
 import TopNav from './layout/TopNav';
+import LoadingSpinner from './common/LoadingSpinner';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ const Dashboard = () => {
   }, [logout, navigate, refreshStudyStatus]);
 
   if (loading) {
-    return <div className="text-center text-white mt-10">Cargando panel...</div>;
+    return <LoadingSpinner label="Cargando panel…" fullscreen />;
   }
 
   if (error) {
@@ -47,6 +48,7 @@ const Dashboard = () => {
 
   const chatbotEnabled = Boolean(featureFlags?.chatbot);
   const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
+  const modeLabel = featureFlags ? (adaptativeEnabled ? 'Tutor IA activo' : 'Práctica estándar') : 'Configuración pendiente';
   const modulesRemaining = Math.max((studyStatus?.requiredModules ?? 0) - (studyStatus?.modulesCompleted ?? 0), 0);
   const checkpointsRemaining = Math.max(
     (studyStatus?.requiredCheckpoints ?? 0) - (studyStatus?.checkpointsPassed ?? 0),
@@ -77,12 +79,10 @@ const Dashboard = () => {
       <main className="flex-1 px-6 md:px-10 py-10">
         <div className="mx-auto max-w-4xl">
           <div className="mb-12">
-            <p className="text-sm font-medium text-[#9eb7a8]">
-              {featureFlags?.assigned_group ? `Grupo ${featureFlags.assigned_group}` : 'Aún sin asignar'}
-            </p>
+            <p className="text-sm font-medium text-[#9eb7a8]">{modeLabel}</p>
             <h1 className="text-4xl font-bold mt-1">Tu ruta de aprendizaje</h1>
             <p className="text-lg text-gray-300 mt-2">
-              Avanza paso a paso. Aquí encontrarás las actividades recomendadas para hoy.
+              Avanza paso a paso con recomendaciones y retroalimentación personalizadas.
             </p>
           </div>
 
