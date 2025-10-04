@@ -110,15 +110,9 @@ const Profile = () => {
 
       <main className="px-6 md:px-10 py-10">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-          {(profileNotice || profileError || passwordNotice) && (
-            <div
-              className={`rounded-3xl border px-4 py-3 text-sm ${
-                profileError
-                  ? 'border-red-500/40 bg-red-500/10 text-red-200'
-                  : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-              }`}
-            >
-              {profileError || profileNotice || passwordNotice}
+          {(profileNotice || passwordNotice) && (
+            <div className="rounded-3xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              {profileNotice || passwordNotice}
             </div>
           )}
 
@@ -179,7 +173,10 @@ const Profile = () => {
               <button
                 type="button"
                 className="h-8 w-8 rounded-full border border-[#203028] text-[#cbe0d7] hover:border-[var(--primary-color)] hover:text-white"
-                onClick={() => setShowEditModal(false)}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setProfileError(null);
+                }}
                 aria-label="Cerrar edición"
               >
                 ×
@@ -246,7 +243,10 @@ const Profile = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setProfileError(null);
+                  }}
                   className="inline-flex h-11 items-center justify-center rounded-full border border-[#203028] px-6 text-sm font-semibold text-[#cbe0d7] transition hover:border-[var(--primary-color)] hover:text-white"
                 >
                   Cancelar

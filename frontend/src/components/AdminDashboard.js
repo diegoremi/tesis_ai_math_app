@@ -139,7 +139,12 @@ const AdminDashboard = () => {
     }
   };
 
+  const canEditFlags = user?.role === 'admin';
+
   const handleToggleFlag = async (userId, payload) => {
+    if (!canEditFlags) {
+      return;
+    }
     setFlagNotice(null);
     setFlagError(null);
     try {
@@ -392,11 +397,12 @@ const AdminDashboard = () => {
                         <td className="px-4 py-3 text-[#9eb7a8] uppercase">{participant.role}</td>
                         <td className="px-4 py-3 text-[#cbe0d7]">{conditionLabel}</td>
                         <td className="px-4 py-3">
-                          <label className="relative inline-flex h-6 w-11 items-center">
+                          <label className={`relative inline-flex h-6 w-11 items-center ${!canEditFlags ? 'opacity-40 cursor-not-allowed' : ''}`}>
                             <input
                               type="checkbox"
                               className="peer sr-only"
                               checked={adaptativo}
+                              disabled={!canEditFlags}
                               onChange={(event) => handleToggleFlag(participant.user_id, { adaptativo: event.target.checked })}
                               aria-label={`Activar tutor IA para ${fullName}`}
                             />
@@ -405,11 +411,12 @@ const AdminDashboard = () => {
                           </label>
                         </td>
                         <td className="px-4 py-3">
-                          <label className="relative inline-flex h-6 w-11 items-center">
+                          <label className={`relative inline-flex h-6 w-11 items-center ${!canEditFlags ? 'opacity-40 cursor-not-allowed' : ''}`}>
                             <input
                               type="checkbox"
                               className="peer sr-only"
                               checked={chatbot}
+                              disabled={!canEditFlags}
                               onChange={(event) => handleToggleFlag(participant.user_id, { chatbot: event.target.checked })}
                               aria-label={`Activar chatbot para ${fullName}`}
                             />

@@ -40,14 +40,15 @@ flowchart LR
 
 - Usa **pretest**, errores por dominio y telemetría (`eventos`) para planificar **siguientes ejercicios** (dificultad adaptativa).
 - Entrega objetivos de sesión (p. ej., “≥3 sesiones/semana”).
-- Genera módulos de teoría personalizados a través del microservicio FastAPI + Gemini (`/study/theory/generate`).
-- El backend controla condiciones de carrera (`P2002`) y reutiliza módulos recientes; si la IA no responde, existe un fallback local claramente identificado en logs.
+- Genera módulos de teoría personalizados vía FastAPI + Gemini (`/study/theory/generate`) para participantes **GE**.
+- Para cohortes **GC** o si el servicio IA falla, se sirve una biblioteca de módulos estáticos (3 plantillas rotativas) con teoría, ejemplos guiados, visualizaciones y checkpoints precurados; los registros en `theoryModules` indican `version=control-v1` o `fallback` según corresponda.
+- El backend controla condiciones de carrera (`P2002`) y reutiliza módulos recientes.
 
 ### 2.3 PracticeGen Agent (nuevo)
 
 - `/activities/exercise` y `/activities/exercise/submit` ahora generan ítems on-demand con LLM (Gemini u OpenAI según `AI_PROVIDER`).
 - Prompt maestro produce JSON con feedback inmediato (`explain_correct`, `explain_incorrect`). Se valida y persiste en `PracticeGenerated` y `PracticeAttempt` para trazabilidad y reutilización.
-- Si la IA falla o la clave no está disponible, se usa banco `practice_v1` como fallback y se loguea el evento.
+- Para cohortes **GC** (o fallos IA) se entrega un set curado (`practice_v1`) con al menos 10 ítems manuales; los intentos se registran igual, pero no se consulta al LLM.
 
 ### 2.4 AssessmentAgent
 
@@ -284,6 +285,8 @@ GET    /survey/items?instrument=... # catálogo Likert (item-level)
 POST   /survey/submit               # guarda submissión item-level
 
 GET    /admin/export?type=ancova    # CSV consolidado (ver abajo)
+GET    /admin/export/report         # reporte JSON (resumen + dataset)
+PATCH  /admin/users/:id/feature-flags  # activa tutor IA/chatbot (admin)
 ```
 
 **Respuesta `/exports/ancova-dataset` (JSON por fila):**
@@ -314,21 +317,28 @@ GET    /admin/export?type=ancova    # CSV consolidado (ver abajo)
 ## 5) Protocolo experimental (flujo de pantallas)
 
 1. **Consentimiento** → `POST /auth/consent` → crea `consentimientos`.
-2. **Registro** → **Pretest** (bloquea IA) → guarda `evaluaciones` + `respuestas_test`.
-3. **Randomización** (`/randomize`) → registra `asignaciones` y **feature_flags**:
+2. **Registro** → asignación automática **round-robin** (`GE`/`GC`) con auto-creación de `feature_flags`; inmediatamente después se fuerza el **Pretest** (sin IA) y se guardan `evaluaciones` + `respuestas_test`.
+3. **Randomización manual** (`/study/randomize`) → opcional para los administradores; permite reequilibrar y regenerar `asignaciones` y **feature_flags** según el método elegido:
 
    - GE: `chatbot=true`, `adaptativo=true`
    - GC: `chatbot=false`, `adaptativo=false` (UI muestra recursos equivalentes)
 
 4. **Intervención (8–10 semanas)**
 
-   - GE: práctica adaptativa + TutorAgent (hints/explicaciones)
-   - GC: práctica estándar sin IA
-   - Telemetría en `eventos` + agregados en `actividades`
+   - GE: práctica adaptativa (LLM) + TutorAgent (hints/explicaciones) + módulos IA.
+   - GC: práctica estándar (
+     banco `practice_v1`
+     ) + módulos estáticos `control-v1` (teoría guiada sin IA).
+   - Telemetría en `eventos` + agregados en `actividades`.
 
 5. **Postest** (bloquea IA)
 6. **Encuestas**: Motivación/Autonomía + **TAM** (item-level)
-7. **Export**: `/exports/ancova-dataset` para análisis (ANCOVA, moderación, dosis-respuesta).
+7. **Export**: `/exports/ancova-dataset` o `/admin/export/report` para análisis (ANCOVA, moderación, dosis-respuesta).
+
+**Notas operativas para admins**
+
+- El panel `/admin` permite consultar métricas, descargar reportes completos (`Reporte completo`) y activar/desactivar tutor IA o chatbot por participante (`PATCH /admin/users/:id/feature-flags`).
+- Al prender el tutor IA desde el panel se reasigna automáticamente al grupo **GE**; al apagarlo, el usuario regresa a **GC** sin exponer la etiqueta “control” en la UI.
 
 ---
 
