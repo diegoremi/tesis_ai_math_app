@@ -7,6 +7,7 @@ import AppBrand from "../layout/AppBrand";
 const Register = () => {
   const navigate = useNavigate();
   const recaptchaRef = useRef();
+  const recaptchaSiteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -33,7 +34,7 @@ const Register = () => {
     
 
     const recaptchaToken = recaptchaRef.current?.getValue?.();
-    if (!recaptchaToken) {
+    if (recaptchaSiteKey && !recaptchaToken) {
       setError("Completa el reCAPTCHA antes de continuar.");
       setLoading(false);
       return;
@@ -45,13 +46,18 @@ const Register = () => {
       const first_name = nameParts[0] || '';
       const last_name = nameParts.slice(1).join(' ') || '';
 
-      await registerUser({ 
-        ...formData, 
-        first_name, 
-        last_name, 
+      const registrationPayload = {
+        ...formData,
+        first_name,
+        last_name,
         goal: formData.math_goals, // Map math_goals to goal for backend
-        recaptchaToken 
-      });
+      };
+
+      if (recaptchaSiteKey && recaptchaToken) {
+        registrationPayload.recaptchaToken = recaptchaToken;
+      }
+
+      await registerUser(registrationPayload);
       if (recaptchaRef.current) {
         recaptchaRef.current.reset();
       }
@@ -116,11 +122,16 @@ const Register = () => {
               <p className="text-white text-base font-medium leading-normal">Objetivos con matemática</p>
               <textarea className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white min-h-28" placeholder="Ej. Aprobar análisis, fortalecer álgebra" name="math_goals" value={formData.math_goals} onChange={handleChange}></textarea>
             </label>
-            
-            <ReCAPTCHA
-              ref={recaptchaRef}
-              sitekey="6LdsZcErAAAAACDfU6SVWkAJ6HNK73kKIyhocd-m" // Replace with your site key
-            />
+            {recaptchaSiteKey ? (
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={recaptchaSiteKey}
+              />
+            ) : (
+              <p className="text-red-400 text-sm">
+                Falta configurar la clave de sitio de reCAPTCHA en el entorno.
+              </p>
+            )}
             <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-12 px-5 mt-4 bg-[var(--primary-color)] text-[#111714] text-base font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity" type="submit" disabled={loading}>
               <span className="truncate">{loading ? "Creando cuenta..." : "Crear cuenta"}</span>
             </button>
