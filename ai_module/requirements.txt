@@ -2,3 +2,4 @@ fastapi==0.116.1
 pydantic==2.11.7
 google-generativeai
 mangum
+uvicorn[standard]
