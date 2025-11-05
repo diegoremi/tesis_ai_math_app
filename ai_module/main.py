@@ -9,8 +9,10 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import google.generativeai as genai
+from mangum import Mangum
 
 app = FastAPI()
+handler = Mangum(app)
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 if API_KEY:
