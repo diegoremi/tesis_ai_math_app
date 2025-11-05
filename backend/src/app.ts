@@ -10,6 +10,8 @@ import surveyRoutes from './routes/survey.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import studyRoutes from './routes/study.routes.js';
 import eventRoutes from './routes/event.routes.js';
+import { requestLogger, errorLogger } from './middleware/errorLogger.js';
+import logger from './utils/logger.js';
 
 const app: Express = express();
 
@@ -38,6 +40,7 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 app.use(express.json());
+app.use(requestLogger);
 
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
@@ -52,5 +55,14 @@ app.use('/api/events', eventRoutes);
 app.get('/', (req: Request, res: Response) => {
   res.send('Backend is running!');
 });
+
+// 404 handler
+app.use((req: Request, res: Response) => {
+  logger.warn(`404 Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({ error: 'Not Found' });
+});
+
+// Error handling middleware (must be last)
+app.use(errorLogger);
 
 export default app;

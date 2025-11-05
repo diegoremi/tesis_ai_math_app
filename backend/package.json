@@ -21,9 +21,10 @@
     "helmet": "^8.1.0",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.16.3",
     "serverless-http": "^4.0.0",
     "tsx": "^4.20.5",
-    "prisma": "^6.16.3"
+    "winston": "^3.18.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
