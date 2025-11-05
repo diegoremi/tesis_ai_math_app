@@ -1,0 +1,25 @@
+# Environment files
+.env
+*.env
+*.env.local
+.env.local
+frontend/.env
+backend/.env
+ai_module/.env
+!*.env.example
+!**/.env.example
+
+# Dependency directories
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Python virtual environments
+ai_module/.venv/
+ai_module/venv/
+
+# Build artifacts
+frontend/build/
+backend/dist/
+ai_module/__pycache__/
+**/__pycache__/
