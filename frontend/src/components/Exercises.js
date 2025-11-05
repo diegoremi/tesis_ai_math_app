@@ -20,7 +20,7 @@ const Exercises = () => {
   const [hint, setHint] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const MATH_REGEX = /(\$\$[^$]+\$\$|\$[^$]+\$)/g;
+  const MATH_REGEX = /(\$\$[^$]+\$\$|\$[^$]+\$|\\\[[^\]]+\\\]|\\\([^\)]+\\\))/g;
 
   const splitMathSegments = (text) => {
     return String(text ?? "")
@@ -31,8 +31,14 @@ const Exercises = () => {
         if (trimmed.startsWith("$$") && trimmed.endsWith("$$")) {
           return { type: "block", math: trimmed.slice(2, -2).trim() };
         }
+        if (trimmed.startsWith("\\[") && trimmed.endsWith("\\]")) {
+          return { type: "block", math: trimmed.slice(2, -2).trim() };
+        }
         if (trimmed.startsWith("$") && trimmed.endsWith("$")) {
           return { type: "inline", math: trimmed.slice(1, -1).trim() };
+        }
+        if (trimmed.startsWith("\\(") && trimmed.endsWith("\\)")) {
+          return { type: "inline", math: trimmed.slice(2, -2).trim() };
         }
         return { type: "text", text: segment };
       });

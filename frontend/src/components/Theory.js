@@ -17,7 +17,7 @@ const clamp = (value) => {
   return value;
 };
 
-const MATH_TOKEN_REGEX = /(\$\$[^$]+\$\$|\$[^$]+\$)/g;
+const MATH_TOKEN_REGEX = /(\$\$[^$]+\$\$|\$[^$]+\$|\\\[[^\]]+\\\]|\\\([^\)]+\\\))/g;
 
 const splitMathSegments = (value) => {
   const text = String(value ?? '');
@@ -29,8 +29,14 @@ const splitMathSegments = (value) => {
       if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
         return { type: 'block', math: trimmed.slice(2, -2).trim() };
       }
+      if (trimmed.startsWith('\\[') && trimmed.endsWith('\\]')) {
+        return { type: 'block', math: trimmed.slice(2, -2).trim() };
+      }
       if (trimmed.startsWith('$') && trimmed.endsWith('$')) {
         return { type: 'inline', math: trimmed.slice(1, -1).trim() };
+      }
+      if (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) {
+        return { type: 'inline', math: trimmed.slice(2, -2).trim() };
       }
       return { type: 'text', text: segment };
     });
