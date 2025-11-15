@@ -84,6 +84,42 @@ Press `Ctrl+C` to stop all processes. The script creates virtualenvs or copies `
 - `npx prisma db seed` (backed by `prisma/seed.ts`) inserts canonical pretest/posttest and satisfaction survey items.
 - `database_schema.md` summarises tables and migration workflow.
 
+## Synthetic Data Generation
+
+For testing and development purposes, you can generate realistic synthetic user data:
+
+```bash
+cd backend
+npm run seed:synthetic
+```
+
+This script generates 65 users with varied usage trajectories distributed over the last 20 days:
+- **65% complete flow** (pretest → practice sessions → posttest → survey)
+- **18% pretest only** (users who registered but didn't practice)
+- **17% partial flow** (pretest + practice but no posttest)
+
+**Generated data includes:**
+- 50/50 distribution between GE (with chatbot) and GC (control) groups
+- 2-4 practice sessions per active user
+- 3-8 exercises per practice session
+- Realistic improvement patterns (posttest > pretest for most users)
+- AI tutor feedback messages (GE group only)
+- Telemetry events (session_start, correct/incorrect answers, hints, etc.)
+- TAM survey responses for users who completed the flow
+
+**Test credentials:**
+- All users have the password: `password123`
+- Email format: `{firstname}.{lastname}{number}@example.com`
+- Example: `maria.rojas1@example.com`
+
+**Verification:**
+```bash
+cd backend
+npx tsx verify-data.ts
+```
+
+This displays statistics about generated data including user counts, practice sessions, assessments completed, and date ranges.
+
 ## Study Workflow (Happy Path)
 
 1. **Consent** → `POST /study/consent` → UI at `/study/consent` includes download + navigation to pretest.
@@ -101,7 +137,9 @@ Press `Ctrl+C` to stop all processes. The script creates virtualenvs or copies `
 - Frontend build: `npm run build`
 - Prisma format: `npx prisma format`
 - Prisma migration (dev): `npx prisma migrate dev --name <label>`
-- Prisma seed: `npx prisma db seed`
+- Prisma seed (item banks): `npx prisma db seed`
+- **Synthetic data generation**: `npm run seed:synthetic`
+- **Verify synthetic data**: `npx tsx verify-data.ts`
 
 ## Testing
 
