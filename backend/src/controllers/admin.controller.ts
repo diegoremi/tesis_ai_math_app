@@ -165,6 +165,8 @@ export const exportDataController = async (req: AuthenticatedRequest, res: Respo
           'mot_post',
           'auto_pre',
           'auto_post',
+          'device',
+          'internet_connection',
           'sesiones_semana',
           'minutos_totales',
           'ejercicios_resueltos',
@@ -307,6 +309,12 @@ const buildAncovaDataset = async () => {
         where: { activity_type: 'exercise' },
       },
       events: true,
+      infrastructure: {
+        orderBy: { access_id: 'desc' },
+        take: 1,
+      },
+      practiceSummaries: true,
+      practiceAttempts: true,
     },
   });
 
@@ -320,7 +328,8 @@ const buildAncovaDataset = async () => {
         return null;
       }
 
-      const tamSubmission = findSubmission(participant.surveySubmissions, 'tam', 'exit')
+      const tamSubmission = findSubmission(participant.surveySubmissions, 'tam', 'post')
+        ?? findSubmission(participant.surveySubmissions, 'tam', 'exit')
         ?? findSubmission(participant.surveySubmissions, 'tam');
       const motivationPre = findSubmission(participant.surveySubmissions, 'motivacion', 'pre');
       const motivationPost = findSubmission(participant.surveySubmissions, 'motivacion', 'post')
@@ -336,8 +345,22 @@ const buildAncovaDataset = async () => {
       const autoPre = autonomyPre ? average(numericResponses(autonomyPre)) : null;
       const autoPost = autonomyPost ? average(numericResponses(autonomyPost)) : null;
 
-      const totalCorrect = participant.activities.reduce((sum, activity) => sum + (activity.correct_answers ?? 0), 0);
-      const totalAttempts = participant.activities.reduce((sum, activity) => sum + (activity.attempts ?? 0), 0);
+      // Uso desde Activity (legacy)
+      const activityCorrect = participant.activities.reduce((sum, activity) => sum + (activity.correct_answers ?? 0), 0);
+      const activityAttempts = participant.activities.reduce((sum, activity) => sum + (activity.attempts ?? 0), 0);
+
+      // Uso desde PracticeSummary (nuevo sistema)
+      const summaryCorrect = participant.practiceSummaries.reduce((sum, s) => sum + (s.correct_count ?? 0), 0);
+      const summaryAttempts = participant.practiceSummaries.reduce((sum, s) => sum + (s.attempt_count ?? 0), 0);
+      const summaryMinutes = participant.practiceSummaries.reduce((sum, s) => sum + ((s.duration_seconds ?? 0) / 60), 0);
+
+      // Uso desde PracticeAttempt (fallback directo)
+      const attemptCount = participant.practiceAttempts.length;
+      const attemptCorrect = participant.practiceAttempts.filter(a => a.correct).length;
+
+      // Combinar métricas (priorizar PracticeSummary > Activity > PracticeAttempt)
+      const totalCorrect = summaryCorrect || activityCorrect || attemptCorrect;
+      const totalAttempts = summaryAttempts || activityAttempts || attemptCount;
       const exercisesSolved = totalCorrect;
       const accuracy = totalAttempts > 0 ? Number((totalCorrect / totalAttempts).toFixed(2)) : null;
 
@@ -361,7 +384,12 @@ const buildAncovaDataset = async () => {
         'duracionSeg',
         'duration',
       ]);
-      const totalMinutes = Number((totalDurationSeconds / 60).toFixed(0));
+      // Usar PracticeSummary si disponible, sino metadata de events
+      const totalMinutes = summaryMinutes > 0
+        ? Math.round(summaryMinutes)
+        : Number((totalDurationSeconds / 60).toFixed(0));
+
+      const infra = participant.infrastructure[0];
 
       return {
         id_usuario: participant.participant_code,
@@ -374,6 +402,8 @@ const buildAncovaDataset = async () => {
         mot_post: motPost,
         auto_pre: autoPre,
         auto_post: autoPost,
+        device: infra?.device ?? null,
+        internet_connection: infra?.internet_connection ?? null,
         sesiones_semana: sessionsPerWeek,
         minutos_totales: totalMinutes,
         ejercicios_resueltos: exercisesSolved,

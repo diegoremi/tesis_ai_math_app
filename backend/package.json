@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'tsx src/index.ts'",
     "start": "tsx src/index.ts",
-    "seed:synthetic": "tsx prisma/seed-synthetic.ts"
+    "seed:synthetic": "tsx prisma/seed-synthetic.ts",
+    "db:reset-users": "tsx prisma/reset-users.ts"
   },
   "keywords": [],
   "author": "",

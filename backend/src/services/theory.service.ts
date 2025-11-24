@@ -37,6 +37,18 @@ type StaticModuleBlueprint = {
   };
 };
 
+type TheoryModuleRequest = {
+  participantProfile?: {
+    age?: number | null;
+    educationLevel?: string | null;
+    goal?: string | null;
+    pretestScore?: number | null;
+    weakDomains?: string[];
+  };
+  moduleIndex?: number;
+  previousModuleIds?: string[];
+};
+
 const STATIC_MODULE_LIBRARY: StaticModuleBlueprint[] = [
   {
     title: 'Módulo 1: Fluidez con números',

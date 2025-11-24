@@ -1,267 +1,320 @@
 # AI Math Learning Platform
 
-> **Project:** AI-driven Math Learning Platform
-> **Purpose:** Research-grade GE vs GC study evaluating impact on autonomous learning and motivation (pre-post design with TAM as moderator)
-> **Key Output:** Reproducible dataset `/exports/ancova-dataset` with full traceability (consent, assignment, instrument versions, telemetry)
+> **Tesis:** Impacto de una plataforma educativa basada en inteligencia artificial en el aprendizaje autónomo de matemáticas en jóvenes y adultos del distrito Los Olivos, Lima, 2025.
+>
+> **Diseño:** Investigación aplicada, nivel explicativo, diseño cuasi-experimental (GE vs GC), pretest–postest, análisis ANCOVA.
+>
+> **Dataset principal:** `/admin/export?type=ancova` con trazabilidad completa (consentimiento, asignación, versiones de instrumentos, telemetría).
 
 ---
 
-## 1. Project Overview
+## 1. Contexto del Estudio
 
-AI-driven math learning platform that supports a research-grade experimental study (GE vs GC) for autonomous learning and motivation. The repository hosts a tri-service stack with shared designs and documentation tailored to thesis workflow.
+### 1.1 Diseño de Investigación
+
+| Aspecto | Descripción |
+|---------|-------------|
+| **Tipo** | Investigación aplicada, nivel explicativo |
+| **Diseño** | Cuasi-experimental con grupo experimental (GE) y grupo control (GC) |
+| **Análisis** | Pretest–postest con ANCOVA ajustando por pretest |
+| **Población** | Jóvenes y adultos (≥ 18 años) del distrito Los Olivos, Lima |
+| **Muestra objetivo** | ~100 participantes (GE ≈ 50, GC ≈ 50) |
+| **Duración** | 8–10 semanas de intervención |
+
+### 1.2 Variables del Estudio
+
+| Variable | Tipo | Descripción |
+|----------|------|-------------|
+| **Uso de plataforma IA** | Independiente (VI) | Condición GE vs GC; exposición a funcionalidades IA |
+| **Rendimiento en matemáticas** | Dependiente (VD1) | Medido mediante pretest/postest |
+| **Aprendizaje autónomo** | Dependiente (VD2) | Subescala de la Escala de Aprendizaje Autónomo y Motivación |
+| **Motivación** | Dependiente (VD3) | Subescala de la Escala de Aprendizaje Autónomo y Motivación |
+| **Aceptación tecnológica** | Adicional | Modelo TAM: utilidad percibida y facilidad de uso |
+| **Condiciones de implementación** | Moderador | Infraestructura, conectividad, dispositivo, entorno de estudio |
+
+### 1.3 Mapeo Variables ↔ Instrumentos ↔ Tablas/Vistas
+
+> **Nota de naming:** El término *evaluación* en la tesis corresponde a las tablas/modelos `Assessment*` en la base de datos y en el código. Esta convención sigue el estándar técnico en inglés mientras mantiene la terminología académica en español en la documentación.
+
+| Variable | Instrumento | Tabla BD | Campos Export |
+|----------|-------------|----------|---------------|
+| Rendimiento (VD1) | Prueba de logro (pre/post) | `Assessment`, `AssessmentResponse`, `AssessmentItem` | `pretest`, `postest` |
+| Autonomía (VD2) | Escala Aprendizaje Autónomo y Motivación (subescala autonomía) | `SurveySubmission`, `SurveyResponse` (instrument=`autonomia`) | `auto_pre`, `auto_post` |
+| Motivación (VD3) | Escala Aprendizaje Autónomo y Motivación (subescala motivación) | `SurveySubmission`, `SurveyResponse` (instrument=`motivacion`) | `mot_pre`, `mot_post` |
+| Aceptación TAM | Escala TAM | `SurveySubmission`, `SurveyResponse` (instrument=`tam`) | `tam_utilidad`, `tam_facilidad` |
+| Condiciones (Moderador) | Ficha de condiciones de implementación | `Infrastructure` | `device`, `internet_connection` |
+| Uso/Dosis | Telemetría de uso | `Event`, `Session`, `PracticeAttempt` | `sesiones_semana`, `minutos_totales`, `ejercicios_resueltos`, `porc_aciertos` |
+
+### 1.4 Flujo Experimental
+
+```
+Consentimiento → Randomización 1:1 (GE/GC) → Pretest → Intervención (8-10 sem) → Postest → Encuestas → Export
+```
+
+---
+
+## 2. Overview del Proyecto
+
+Plataforma de aprendizaje de matemáticas impulsada por IA que soporta un estudio experimental de grado investigativo (GE vs GC) evaluando el impacto en el aprendizaje autónomo y la motivación.
 
 ### Quick Start
 
 ```bash
-# One-shot local development (starts all services)
+# Inicio rápido (levanta todos los servicios)
 ./dev.sh
 
-# Or start each service individually:
-# Backend (Express + Prisma)
-cd backend && npm install && npm run dev  # port 8080
-
-# Frontend (React + Tailwind)
-cd frontend && npm install && npm start   # port 3000
-
-# AI Module (FastAPI + Gemini/OpenAI)
-cd ai_module && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && uvicorn main:app --reload  # port 8001
+# O iniciar cada servicio individualmente:
+cd backend && npm install && npm run dev  # puerto 8080
+cd frontend && npm install && npm start   # puerto 3000
+cd ai_module && source .venv/bin/activate && uvicorn main:app --reload  # puerto 8001
 ```
 
 ---
 
-## 2. Architecture
+## 3. Arquitectura
 
 ```
-flowchart LR
-  UI[React/Next: Onboarding, Pre/Post, Practice, Chatbot, Surveys, Reports]
-  API[Node/Express + Prisma]
-  AI[FastAPI: TutorAgent, PlannerAgent, Guardrails]
-  DB[(PostgreSQL)]
-  UI <--> API
-  API <--> DB
-  API <--> AI
+┌─────────────────────────────────────────────────────────────────┐
+│  UI (React/Tailwind)                                            │
+│  Onboarding, Pre/Post, Practice, Chatbot, Surveys, Reports      │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│  API (Node/Express + Prisma)                                   │
+│  Auth, Consent, Randomization, Gating, Assessments, Exports    │
+└─────────────────┬───────────────────────────┬─────────────────┘
+                  │                           │
+                  ▼                           ▼
+        ┌─────────────────┐         ┌─────────────────┐
+        │  PostgreSQL     │         │  AI Module      │
+        │  (Neon/Vercel)  │         │  (FastAPI)      │
+        └─────────────────┘         └─────────────────┘
 ```
 
-### Modules
+### Módulos
 
-| Module | Path | Description |
+| Módulo | Ruta | Descripción |
 |--------|------|-------------|
-| **Frontend** | `frontend/` | Create React App with Tailwind dashboards, study flows, adaptive exercises, surveys, feature-flag-aware chatbot |
-| **Backend** | `backend/` | Express + TypeScript API with Prisma/PostgreSQL. Auth, consent, randomization, feature gating, assessments, telemetry, exports |
-| **AI Module** | `ai_module/` | FastAPI service (Gemini/OpenAI). Hints, tutoring responses, planner guardrails |
-| **Designs** | `designs/` | HTML + PNG design mocks and UI references |
-
-### Key Views (Frontend)
-
-- `/study/consent` - Informed consent with document download
-- `/study/pretest` - Pre-assessment (no AI)
-- `/study/exit-test` - Post-assessment (no AI)
-- `/dashboard` - Main interface with GE/GC gating
-- Satisfaction survey (redesigned)
+| **Frontend** | `frontend/` | React + Tailwind: dashboards, flujo de estudio, ejercicios, encuestas, chatbot (feature-flag) |
+| **Backend** | `backend/` | Express + TypeScript + Prisma: auth, consentimiento, randomización, gating GE/GC, assessments, telemetría, exports |
+| **AI Module** | `ai_module/` | FastAPI (Gemini/OpenAI): hints, tutoring, generación de ejercicios, módulos de teoría |
 
 ---
 
-## 3. Prerequisites & Setup
+## 4. MVP vs Backlog
 
-### Requirements
+### ✅ MVP (Requerido para el experimento)
 
-- Node.js 20+, npm 10+
-- Python 3.11+
-- PostgreSQL (Neon/Supabase/Vercel Postgres recommended)
+| Funcionalidad | Estado | Descripción |
+|---------------|--------|-------------|
+| Registro y autenticación | ✅ | JWT, roles (student/facilitator/admin) |
+| Consentimiento informado | ✅ | Descarga de documento, aceptación versionada |
+| Randomización 1:1 GE/GC | ✅ | Asignación automática balanceada |
+| Feature flags GE/GC | ✅ | Gating de chatbot y funciones adaptativas |
+| Pretest (sin IA) | ✅ | Items versionados, timer, anti-copy |
+| Práctica con ejercicios | ✅ | GE: LLM-generated / GC: banco estático |
+| TutorAgent (hints) | ✅ | Solo GE, hints graduados |
+| Módulos de teoría | ✅ | GE: generados / GC: estáticos |
+| Postest (sin IA) | ✅ | Items versionados, timer, anti-copy |
+| Encuesta Autonomía/Motivación | ✅ | Item-level, timepoints pre/post |
+| Encuesta TAM | ✅ | Item-level, utilidad y facilidad |
+| Ficha de infraestructura | ✅ | Dispositivo, conectividad |
+| Telemetría de eventos | ✅ | Sesiones, aciertos, streaks |
+| Export ANCOVA | ✅ | CSV con todas las variables |
+| Panel admin | ✅ | Métricas, toggle flags, exports |
 
-### Backend Setup
+### 📋 Backlog (Mejoras futuras)
 
-```bash
-cd backend
-npm install
-cp .env.example .env   # Configure DATABASE_URL, JWT_SECRET, API keys
-npx prisma format
-npx prisma migrate deploy
-npx prisma db seed     # Populates assessment + survey item banks
-npm run dev            # Runs on port 8080
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm start    # Runs on port 3000
-```
-
-Set `REACT_APP_API_URL` in `.env.local` if backend runs on different host.
-
-### AI Module Setup
-
-```bash
-cd ai_module
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # Configure GEMINI/OpenAI keys
-uvicorn main:app --reload  # Runs on port 8001
-pytest                 # Smoke tests with mocked models
-```
-
-### Environment Variables
-
-```env
-DATABASE_URL=postgres://...
-JWT_SECRET=...
-AI_PROVIDER=openai          # openai|gemini
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-4o-mini
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-1.5-pro
-PII_REDACTION=true
-FEATURE_FLAGS_DEFAULT=false
-AI_SERVICE_URL=http://localhost:8001
-```
+| Funcionalidad | Prioridad | Descripción |
+|---------------|-----------|-------------|
+| Recordatorios por email | Media | Notificaciones de adherencia |
+| Planner adaptativo avanzado | Baja | ML para secuenciación óptima |
+| Dashboard de facilitador | Media | Vista de progreso por cohorte |
+| Reports estadísticos in-app | Baja | Gráficos de distribución |
+| Tests automatizados E2E | Media | Cypress/Playwright |
 
 ---
 
-## 4. Agents (Behavior)
+## 5. Instrumentos y Enums
 
-### 4.1 TutorAgent
+### 5.1 SurveyInstrument
 
-- **GE mode**: Graduated hints -> step-by-step explanation -> solution on request
-- **GC mode**: **Disabled** (UI and API reject requests)
-- **Logs**: `feedback_ia` table (type: hint/explanation/motivation), no PII
+```prisma
+enum SurveyInstrument {
+  motivacion    // Subescala motivación (Escala Aprendizaje Autónomo y Motivación)
+  autonomia     // Subescala autonomía (Escala Aprendizaje Autónomo y Motivación)
+  tam           // Escala TAM (utilidad percibida + facilidad de uso)
+  satisfaccion  // Variable exploratoria secundaria (NO variable principal)
+}
+```
 
-### 4.2 PlannerAgent / TheoryGen
+**Notas:**
 
-- Uses pretest, domain errors, and telemetry (`eventos`) to plan next exercises (adaptive difficulty)
-- Delivers session goals (e.g., ">=3 sessions/week")
-- Generates personalized theory modules via FastAPI + Gemini (`/study/theory/generate`) for **GE** participants
-- **GC** cohorts or AI failures: serves static module library (6 rotating templates) with curated theory, examples, visualizations, and checkpoints; records indicate `version=control-v1` or `fallback`
+- **`autonomia` y `motivacion`**: Dos instrumentos lógicos que forman parte de una misma escala global de "Aprendizaje Autónomo y Motivación". Se almacenan por separado por razones técnicas, pero conceptualmente se reportan juntos con subdimensiones.
 
-### 4.3 PracticeGen Agent
+- **`tam`**: Escala de Aceptación Tecnológica basada en el modelo TAM, con subdimensiones `tam_utilidad` (perceived usefulness) y `tam_facilidad` (perceived ease of use).
 
-- `/activities/exercise` and `/activities/exercise/submit` generate on-demand items with LLM (Gemini or OpenAI per `AI_PROVIDER`)
-- Master prompt produces JSON with immediate feedback (`explain_correct`, `explain_incorrect`)
-- Validated and persisted in `PracticeGenerated` and `PracticeAttempt` for traceability and reuse
-- **GC** cohorts (or AI failures): delivers curated set (`practice_v1`) with 10+ manual items
+- **`satisfaccion`**: Variable exploratoria secundaria. **NO es variable principal de la tesis ni forma parte del modelo ANCOVA**. Se mantiene implementada para análisis complementarios opcionales, pero no se incluye en el export principal (`/admin/export?type=ancova`). Si se requiere en el futuro, puede agregarse como análisis post-hoc.
 
-### 4.4 AssessmentAgent
+### 5.2 Infrastructure (Moderador)
 
-- Pre/Post **without AI**: Items from versioned bank; timer; anti-copy
-- Saves **item-level responses** for psychometrics (alpha, difficulty, discrimination)
+La tabla `Infrastructure` captura las **condiciones de implementación** (variable moderadora):
 
-### 4.5 ExportAgent
+| Campo | Valores | Descripción |
+|-------|---------|-------------|
+| `device` | `PC`, `mobile`, `tablet` | Tipo de dispositivo |
+| `internet_connection` | `high`, `medium`, `low` | Calidad de conexión |
+| `observations` | Texto libre | Notas sobre entorno de estudio |
 
-- Builds consolidated view (**one row per user**) for ANCOVA/moderation/dose-response analysis
+### 5.3 Otros Enums Clave
+
+```prisma
+enum AssignmentGroup { GE, GC }
+enum AssignmentMethod { azar, emparejamiento }
+enum AssessmentType { pretest, posttest }
+enum SurveyTimepoint { pre, post, exit, follow_up }
+```
+
+**Uso en este estudio vs. valores reservados:**
+
+| Enum | Valores usados en esta tesis | Valores reservados (futuros) |
+|------|------------------------------|------------------------------|
+| `AssignmentMethod` | `azar` (randomización 1:1) | `emparejamiento` (matching por covariables) |
+| `SurveyTimepoint` | `pre`, `post` | `exit`, `follow_up` (seguimiento longitudinal) |
+| `AssignmentGroup` | `GE`, `GC` | — (todos usados) |
+| `AssessmentType` | `pretest`, `posttest` | — (todos usados) |
+
+> **Nota:** Los valores reservados están implementados en el schema para extensibilidad futura, pero **no se utilizan en los análisis de esta tesis**. El export ANCOVA solo incluye datos de timepoints `pre` y `post`.
 
 ---
 
-## 5. Database Schema (PostgreSQL + Prisma)
+## 6. Randomización
 
-> **Design keys**: `asignaciones`, `consentimientos`, **item-level** in tests/surveys, `eventos` (telemetry), **instrument versioning**
+### Implementación
 
-### Core Tables
+La asignación a grupos es una **randomización 1:1 simple controlada por software**, implementada operativamente como un **algoritmo round-robin** con opción de rebalanceo, equivalente a una aleatorización simple balanceada.
 
-| Table | Purpose |
-|-------|---------|
-| `User` | Identity with `participant_code` (pseudonym for exports), demographics, study role |
-| `Consent` | IRB acceptance per document version |
-| `Assignment` | Experimental grouping (GE/GC), method (azar/emparejamiento), seed |
-| `FeatureFlag` | Per-user gating toggles (`chatbot`, `adaptativo`) |
-| `AssessmentItem` | Versioned item bank with domain/competency metadata |
-| `Assessment` | Pre/post attempts with version, timestamps, total score |
-| `AssessmentResponse` | Item-level answers linked to submission and source item |
-| `Activity` | Adaptive practice aggregates |
-| `PracticeGenerated` | AI-generated practice items |
-| `PracticeAttempt` | User attempts on practice items |
-| `Session` | Authenticated usage windows |
-| `Event` | High-frequency telemetry |
-| `AIFeedback` | TutorAgent emissions with `prompt_hash` (PII scrubbed) |
-| `SurveyItem` | Likert statements per instrument/version |
-| `SurveySubmission` | Completed instruments |
-| `SurveyResponse` | Item-level scores (1-5) |
-| `Infrastructure` | Device/connection constraints from onboarding |
-
-### Key Enums
-
-- `AssignmentGroup`: `GE`, `GC`
-- `AssignmentMethod`: `azar`, `emparejamiento`
-- `AssessmentType`: `pretest`, `posttest`
-- `SurveyInstrument`: `motivacion`, `autonomia`, `tam`, `satisfaccion`
-- `EventType`: `session_start`, `session_end`, `hint`, `correct`, `incorrect`, `streak`, `goal_met`
-- `DifficultyLevel`: `basic`, `intermediate`, `advanced`
-
-### Export Views
-
-```sql
--- Pre/Post compact
-vw_prepost: id_usuario, pretest, postest
-
--- Usage aggregates (dose)
-vw_usage: id_usuario, sesiones, minutos_totales, ejercicios_resueltos, porc_aciertos
-
--- TAM subscale averages
-vw_tam_scores: id_usuario, tam_utilidad, tam_facilidad
-
--- Full ANCOVA/moderation export
-vw_ancova_base: id_usuario, grupo, pretest, postest, tam_utilidad, tam_facilidad, edad, nivel_estudio
+```typescript
+// POST /study/randomize (admin) o automático en registro
+for (const [i, user] of users.entries()) {
+  const grupo = i % 2 === 0 ? "GE" : "GC";  // Round-robin 1:1
+  await prisma.assignment.create({ data: { user_id, group: grupo, method: "azar" } });
+  await prisma.featureFlag.create({
+    data: { user_id, chatbot: grupo === "GE", adaptativo: grupo === "GE" },
+  });
+}
 ```
 
-### Migration Workflow
+### Endpoints
 
-```bash
-npx prisma migrate dev --name <label>   # Local development
-npx prisma db seed                       # Populate item banks
-npx prisma migrate deploy                # Production deployment
-npx prisma generate                      # Regenerate client
-```
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/study/randomize` | POST | Admin: asigna usuarios pendientes a GE/GC |
+| `/study/randomize/summary` | GET | Admin: resumen asignados vs pendientes |
+| `/study/feature-flags` | GET | Usuario: obtiene sus flags y grupo |
+
+### Feature Flags por Grupo
+
+| Grupo | `chatbot` | `adaptativo` | Experiencia |
+|-------|-----------|--------------|-------------|
+| **GE** | `true` | `true` | IA completa: hints, ejercicios LLM, teoría generada |
+| **GC** | `false` | `false` | Recursos estándar: banco estático, teoría manual |
 
 ---
 
-## 6. API Endpoints
+## 7. Agentes (Comportamiento)
 
-### Authentication & Study Setup
+### 7.1 TutorAgent
+- **GE**: Hints graduados → explicación paso a paso → solución bajo demanda
+- **GC**: Deshabilitado (UI y API rechazan requests)
+- **Logs**: Tabla `AIFeedback` (type: hint/explanation/motivation), sin PII
+
+### 7.2 PlannerAgent / TheoryGen
+- Usa pretest, errores por dominio y telemetría para planificar ejercicios
+- **GE**: Genera módulos de teoría personalizados vía Gemini
+- **GC**: Sirve biblioteca estática (6 templates) con `version=control-v1`
+
+### 7.3 PracticeGen Agent
+- Genera items on-demand con LLM (Gemini/OpenAI)
+- **GC** (o fallas IA): Entrega set curado `practice_v1`
+
+### 7.4 AssessmentAgent
+- Pre/Post **sin IA**: Items de banco versionado; timer; anti-copy
+- Guarda **respuestas item-level** para psicometría
+
+---
+
+## 8. Base de Datos (PostgreSQL + Prisma)
+
+### Tablas Principales
+
+| Tabla | Propósito |
+|-------|-----------|
+| `User` | Identidad con `participant_code` (pseudónimo), demografía, rol |
+| `Consent` | Aceptación IRB por versión de documento |
+| `Assignment` | Asignación GE/GC, método (azar/emparejamiento) |
+| `FeatureFlag` | Toggles por usuario (`chatbot`, `adaptativo`) |
+| `AssessmentItem` | Banco de items versionado |
+| `Assessment` | Intentos pre/post con versión, timestamps, score |
+| `AssessmentResponse` | Respuestas item-level |
+| `SurveyItem` | Reactivos Likert por instrumento/versión |
+| `SurveySubmission` | Instrumentos completados |
+| `SurveyResponse` | Respuestas item-level (1-5) |
+| `Infrastructure` | Condiciones de implementación (moderador) |
+| `Event` | Telemetría de alta frecuencia |
+| `Session` | Ventanas de uso autenticado |
+| `AIFeedback` | Emisiones del TutorAgent |
+| `PracticeGenerated` | Items de práctica generados |
+| `PracticeAttempt` | Intentos del usuario |
+
+---
+
+## 9. API Endpoints
+
+### Autenticación y Estudio
 
 ```http
 POST   /auth/register
-POST   /study/consent               # body: {documentVersion, accepted}
-POST   /study/randomize             # admin-only; assigns GE/GC and feature flags
-GET    /study/randomize/summary     # admin-only; shows assigned vs pending
-GET    /study/feature-flags         # returns flags + assigned group
+POST   /study/consent
+POST   /study/randomize             # admin
+GET    /study/randomize/summary     # admin
+GET    /study/feature-flags
 ```
 
 ### Assessments
 
 ```http
-GET    /evaluations/items?type=pretest|posttest  # Versioned item bank (no AI)
-POST   /evaluations                               # Save score + item-level
-GET    /evaluations                               # Participant history
+GET    /evaluations/items?type=pretest|posttest
+POST   /evaluations
+GET    /evaluations
 ```
 
-### Practice & Tutoring
+### Práctica y Tutoría
 
 ```http
-GET    /activities/exercise         # Adaptive exercise
-POST   /activities/exercise/submit  # Save result
-POST   /ai/hint                     # TutorAgent (GE only), logs to feedback_ia
-POST   /events                      # Fine-grained telemetry
-GET    /events                      # Retrieve recent events
+GET    /activities/exercise
+POST   /activities/exercise/submit
+POST   /ai/hint                     # GE only
+POST   /events
 ```
 
-### Surveys
+### Encuestas
 
 ```http
-GET    /survey/items?instrument=... # Likert catalog (item-level)
-POST   /survey/submit               # Save item-level submission
+GET    /survey/items?instrument=...
+POST   /survey/submit
 ```
 
-### Admin & Export
+### Admin y Export
 
 ```http
-GET    /admin/export?type=ancova    # Consolidated CSV
-GET    /admin/export/report         # JSON report (summary + dataset)
-PATCH  /admin/users/:id/feature-flags  # Toggle tutor/chatbot (admin)
+GET    /admin/export?type=ancova
+GET    /admin/export/report
+PATCH  /admin/users/:id/feature-flags
 ```
 
-### Export Response Format (`/exports/ancova-dataset`)
+### Formato Export ANCOVA
 
 ```json
 {
@@ -275,6 +328,8 @@ PATCH  /admin/users/:id/feature-flags  # Toggle tutor/chatbot (admin)
   "mot_post": 3.6,
   "auto_pre": 3.0,
   "auto_post": 3.5,
+  "device": "PC",
+  "internet_connection": "high",
   "sesiones_semana": 3,
   "minutos_totales": 430,
   "ejercicios_resueltos": 220,
@@ -286,178 +341,268 @@ PATCH  /admin/users/:id/feature-flags  # Toggle tutor/chatbot (admin)
 
 ---
 
-## 7. Experimental Protocol (Screen Flow)
+## 10. Protocolo Experimental
 
-1. **Consent** -> `POST /auth/consent` -> creates `consentimientos`
-2. **Registration** -> automatic **round-robin** assignment (GE/GC) with auto-creation of `feature_flags`; immediately forces **Pretest** (no AI), saves `evaluaciones` + `respuestas_test`
-3. **Manual Randomization** (`/study/randomize`) -> optional for admins; rebalance and regenerate `asignaciones` and **feature_flags**:
-   - GE: `chatbot=true`, `adaptativo=true`
-   - GC: `chatbot=false`, `adaptativo=false` (UI shows equivalent resources)
-4. **Intervention (8-10 weeks)**
-   - GE: adaptive practice (LLM) + TutorAgent (hints/explanations) + AI modules
-   - GC: standard practice (`practice_v1` bank) + static `control-v1` modules
-   - Telemetry in `eventos` + aggregates in `actividades`
-5. **Posttest** (blocks AI)
-6. **Surveys**: Motivation/Autonomy + **TAM** (item-level)
-7. **Export**: `/exports/ancova-dataset` or `/admin/export/report` for analysis
+1. **Consentimiento** → `POST /study/consent` → crea `Consent`
+2. **Registro** → asignación automática round-robin 1:1 (GE/GC) + `FeatureFlag`
+3. **Pretest** (sin IA) → guarda `Assessment` + `AssessmentResponse`
+4. **Intervención (8-10 semanas)**
+   - GE: práctica adaptativa + TutorAgent + módulos IA
+   - GC: práctica estándar + módulos estáticos
+5. **Postest** (bloquea IA)
+6. **Encuestas**: Autonomía/Motivación + TAM (item-level)
+7. **Export**: `/admin/export?type=ancova`
 
-### UI Gating Rules
+### Reglas de Gating UI
 
-- **Assessments (pre/post)**: No chatbot, no hints, no copy/paste, visible timer
-- **Mandatory pretest after login**: Redirect to `/study/pretest` until complete
-- **GE vs GC**: Conditional buttons/actions per `feature_flags`
-- **Daily Learning**: Adherence bar and goal >=3 sessions/week
-- **Progress Report**: Shows "dose" (minutes, exercises, accuracy, streaks)
+- **Assessments**: Sin chatbot, sin hints, sin copy/paste, timer visible
+- **Pretest obligatorio**: Redirect hasta completar
+- **GE vs GC**: Acciones condicionales según `featureFlag`
 
 ---
 
-## 8. Synthetic Data Generation
+## 11. Alineación con la Tesis
 
-For testing and development without real user data:
+Este proyecto implementa **exactamente** el diseño de investigación descrito en la tesis:
+
+### Variables Implementadas
+
+| Variable Tesis | Implementación App |
+|----------------|-------------------|
+| VI: Uso de plataforma IA (GE vs GC) | `Assignment.group` + `FeatureFlag` |
+| VD1: Rendimiento matemáticas | `Assessment` (pretest/posttest) + `AssessmentResponse` |
+| VD2: Aprendizaje autónomo | `SurveySubmission` (instrument=autonomia) |
+| VD3: Motivación | `SurveySubmission` (instrument=motivacion) |
+| TAM (variable adicional) | `SurveySubmission` (instrument=tam) |
+| Moderador: Condiciones | `Infrastructure` (device, internet_connection) |
+
+### Instrumentos Implementados
+
+| Instrumento Tesis | Tabla/Modelo | Endpoint |
+|-------------------|--------------|----------|
+| Prueba de logro (pre/post) | `AssessmentItem`, `Assessment`, `AssessmentResponse` | `/evaluations/*` |
+| Escala Aprendizaje Autónomo y Motivación | `SurveyItem`, `SurveySubmission`, `SurveyResponse` | `/survey/*` |
+| Escala TAM | `SurveyItem`, `SurveySubmission`, `SurveyResponse` | `/survey/*` |
+| Ficha condiciones implementación | `Infrastructure` | Onboarding |
+
+### Dataset para Análisis Estadístico
+
+El endpoint `/admin/export?type=ancova` devuelve CSV con los campos necesarios para ANCOVA:
+
+- **Identificación**: `id_usuario` (pseudonimizado)
+- **Grupo**: `grupo` (GE/GC)
+- **VD1**: `pretest`, `postest`
+- **VD2-VD3**: `auto_pre`, `auto_post`, `mot_pre`, `mot_post`
+- **TAM**: `tam_utilidad`, `tam_facilidad`
+- **Moderador**: `device`, `internet_connection`
+- **Dosis**: `sesiones_semana`, `minutos_totales`, `ejercicios_resueltos`, `porc_aciertos`
+- **Covariables**: `edad`, `nivel_estudio`
+
+---
+
+## 12. Setup
+
+### Requisitos
+
+- Node.js 20+, npm 10+
+- Python 3.11+
+- PostgreSQL (Neon/Supabase/Vercel Postgres)
+
+### Backend
 
 ```bash
 cd backend
-npm run seed:synthetic    # Generate 65 users with complete histories
-npx tsx verify-data.ts    # Verify generated data
+npm install
+cp .env.example .env   # DATABASE_URL, JWT_SECRET, API keys
+npx prisma migrate deploy
+npx prisma db seed
+npm run dev
 ```
 
-### Distribution
+### Frontend
 
-- **65% complete flow** (42 users): consent -> pretest -> practice -> posttest -> survey
-- **18% pretest only** (12 users): registered but didn't practice
-- **17% partial flow** (11 users): pretest + practice, no posttest
-- **50/50 GE/GC** group assignment
+```bash
+cd frontend
+npm install
+npm start
+```
 
-### Generated Data Includes
+### AI Module
 
-- Realistic Peruvian names and demographics
-- 2-4 practice sessions per active user (3-8 exercises each)
-- Realistic improvement patterns (posttest > pretest for most)
-- AI tutor feedback (GE only)
-- Telemetry events (~2,400+ total)
-- TAM survey responses
+```bash
+cd ai_module
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
 
-### Test Credentials
+### Variables de Entorno
 
-- Password (all users): `password123`
-- Email format: `{firstname}.{lastname}{number}@example.com`
-- Example: `maria.rojas1@example.com`
+```env
+DATABASE_URL=postgres://...
+JWT_SECRET=...
+AI_PROVIDER=gemini
+GEMINI_API_KEY=...
+AI_SERVICE_URL=http://localhost:8001
+```
 
 ---
 
-## 9. Scripts Reference
+## 13. Scripts de Referencia
 
-| Script | Description |
+| Script | Descripción |
 |--------|-------------|
-| `npm run dev` | Backend development server |
-| `npm start` | Frontend development server |
-| `npx tsc --noEmit` | Type-check backend |
-| `npm run build` | Production frontend build |
-| `npx prisma format` | Format Prisma schema |
-| `npx prisma migrate dev --name <label>` | Create migration |
-| `npx prisma db seed` | Seed item banks |
-| `npm run seed:synthetic` | Generate synthetic users |
-| `npx tsx verify-data.ts` | Verify synthetic data |
-| `pytest` | AI module tests |
+| `npm run dev` | Backend desarrollo |
+| `npm start` | Frontend desarrollo |
+| `npx prisma db seed` | Seed bancos de items |
+| `npm run db:reset-users` | Limpiar datos de usuarios (preserva bancos de items) |
+| `npm run seed:synthetic` | Generar 60 usuarios sintéticos con patrones ANCOVA |
 
 ---
 
-## 10. Ethics, Privacy & Guardrails
+## 13.1. Datos Sintéticos para SPSS/ANCOVA
 
-- **Pseudonymization** in exports (no email)
-- **PII separation** (User table vs analytic views)
-- **No PII in prompts**: Hash stored in `feedback_ia.prompt_hash`
-- **Retention**: Define TTL for raw `eventos` if size grows
-- **Transparency in UI**: "AI active" label (GE), data policy, withdrawal rights
-- **Ethical approval** required before data collection
+El script `prisma/seed-synthetic.ts` genera datos realistas para pruebas de hipótesis y verificación del pipeline de análisis.
 
-### Guardrail Example (FastAPI)
+### Ejecución
 
-```python
-def redact(text: str) -> str:
-    patterns = [r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", r"\+?\d[\d\-\s]{7,}"]
-    for p in patterns:
-        text = re.sub(p, "[REDACTED]", text)
-    return text
+```bash
+# 1. Limpiar datos existentes (preserva bancos de items)
+npm run db:reset-users
+
+# 2. Generar datos sintéticos
+npm run seed:synthetic
+```
+
+### Características de los Datos Generados
+
+| Aspecto | Implementación |
+|---------|----------------|
+| **Total usuarios** | 60 (configurable) |
+| **Balance GE/GC** | ~52% GE, ~48% GC (round-robin) |
+| **Nombres** | 50 apellidos + 50 nombres femeninos + 50 masculinos peruanos |
+| **Distritos** | Ponderados (Los Olivos 35%, SMP 15%, etc.) |
+| **Emails** | 8 patrones realistas (gmail, hotmail, outlook) |
+| **Edades** | Distribución normal μ=28, σ=8, rango [18-55] |
+
+### Patrones Estadísticos (Diseñados para ANCOVA)
+
+```
+Pretest:   GE y GC similares (M ≈ 10, SD ≈ 3)
+Postest:   GE > GC con efecto moderado-grande
+Mejora GE: +5.5 puntos (SD 2.5)
+Mejora GC: +2.0 puntos (SD 2.0)
+Cohen's d: ~0.5 a 1.2 (efecto moderado a grande)
+```
+
+### Trayectorias de Usuario
+
+| Trayectoria | % | Descripción |
+|-------------|---|-------------|
+| `complete` | 67% | Pretest → Práctica → Postest → Encuestas |
+| `pretest_only` | 15% | Solo pretest (abandono temprano) |
+| `no_posttest` | 18% | Práctica sin postest |
+
+### Infraestructura como Moderador
+
+El script simula el impacto de las condiciones de implementación:
+
+| Conexión | % Usuarios | Multiplicador Sesiones | Penalización Precisión |
+|----------|------------|------------------------|------------------------|
+| `high` | 50% | 1.0x | 0% |
+| `medium` | 35% | 0.8x | -3% |
+| `low` | 15% | 0.5x | -10% |
+
+### Encuestas Generadas
+
+- **Autonomía** (pre/post): 6 items, escala Likert 1-5
+- **Motivación** (pre/post): 6 items, escala Likert 1-5
+- **TAM** (post): 8 items, subescalas utilidad (3) y facilidad (5)
+
+### Verificación de Estadísticas
+
+Al ejecutar el seed, se muestra un resumen para verificar antes de exportar a SPSS:
+
+```
+📈 GRUPO EXPERIMENTAL (GE):
+   Pretest:  n=31, M=10.06, SD=2.98
+   Postest:  n=19, M=16.95, SD=3.32
+   Ganancia: M=6.89
+
+📉 GRUPO CONTROL (GC):
+   Pretest:  n=29, M=9.93, SD=2.63
+   Postest:  n=21, M=12.76, SD=3.79
+   Ganancia: M=2.83
+
+🎯 Cohen's d estimado: 1.18
 ```
 
 ---
 
-## 11. Deployment Checklist
+## 13.2. Export para SPSS
 
-1. Configure `DATABASE_URL` for production; run `npx prisma migrate deploy` then `npx prisma db seed` (if fresh)
-2. Set env vars per service (`JWT_SECRET`, API keys, feature flags)
-3. Build frontend (`npm run build`) and deploy to Vercel/static host
-4. Deploy backend (Railway/Render). Confirm `/health` endpoint and secure CORS origins
-5. Deploy AI module (Railway). Update `AI_SERVICE_URL` as needed
-6. Smoke-test: consent -> pretest -> dashboard -> survey -> export flow on staging
+### Endpoint CSV
 
----
-
-## 12. QA Acceptance Criteria
-
-- [ ] **Randomization** creates correct `asignaciones` and `feature_flags`
-- [ ] **Consent** saved with `version_documento`
-- [ ] **Pre/Post** register items and score; AI blocked
-- [ ] **Surveys** save item-level; subscale calculation in views
-- [ ] **Telemetry** registers `eventos` and `actividades`
-- [ ] **Export** returns exactly defined fields with **N rows = N users with posttest**
-- [ ] **PII** doesn't appear in views or exports
-
----
-
-## 13. Development Roadmap
-
-- **Sprint 1:** DB migrations + consent + randomization + pretest
-- **Sprint 2:** Practice + TutorAgent (GE) + gating (GC) + basic telemetry
-- **Sprint 3:** Posttest + item-level surveys + SQL views + export
-- **Sprint 4:** Adaptive planner + reports + adherence reminders
-- **Sprint 5:** QA, security, analysis documentation (R/SPSS notebooks)
-
----
-
-## 14. Admin Operations
-
-- Admin panel at `/admin` allows:
-  - Consulting metrics
-  - Downloading complete reports (`Reporte completo`)
-  - Toggling AI tutor/chatbot per participant (`PATCH /admin/users/:id/feature-flags`)
-- Enabling AI tutor automatically reassigns to **GE**; disabling returns to **GC**
-
----
-
-## Appendix A: Randomization Example
-
-```typescript
-// POST /randomize
-const users = await prisma.usuarios.findMany({ where: { randomized: false } });
-shuffleWithSeed(users, seed);
-for (const [i, u] of users.entries()) {
-  const grupo = i % 2 === 0 ? "GE" : "GC";
-  await prisma.asignaciones.create({
-    data: { id_usuario: u.id_usuario, grupo, metodo: "azar", seed },
-  });
-  await prisma.feature_flags.create({
-    data: {
-      id_usuario: u.id_usuario,
-      chatbot: grupo === "GE",
-      adaptativo: grupo === "GE",
-    },
-  });
-}
+```http
+GET /admin/export?type=ancova
+Authorization: Bearer {token_admin}
 ```
 
+Devuelve CSV compatible con IBM SPSS con todas las variables del modelo ANCOVA.
+
+### Columnas del Export
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id_usuario` | UUID | Código pseudonimizado |
+| `grupo` | Categórico | GE / GC |
+| `pretest` | Numérico | Puntaje pretest (0-24) |
+| `postest` | Numérico | Puntaje postest (0-24) |
+| `tam_utilidad` | Numérico | Promedio subescala TAM utilidad (1-5) |
+| `tam_facilidad` | Numérico | Promedio subescala TAM facilidad (1-5) |
+| `mot_pre` | Numérico | Promedio motivación pre (1-5) |
+| `mot_post` | Numérico | Promedio motivación post (1-5) |
+| `auto_pre` | Numérico | Promedio autonomía pre (1-5) |
+| `auto_post` | Numérico | Promedio autonomía post (1-5) |
+| `device` | Categórico | PC / mobile / tablet |
+| `internet_connection` | Categórico | high / medium / low |
+| `sesiones_semana` | Numérico | Sesiones promedio por semana |
+| `minutos_totales` | Numérico | Tiempo total de uso (minutos) |
+| `ejercicios_resueltos` | Numérico | Total ejercicios correctos |
+| `porc_aciertos` | Numérico | Proporción de aciertos (0-1) |
+| `edad` | Numérico | Edad del participante |
+| `nivel_estudio` | Categórico | secundaria / universitaria / otro |
+
+### Importar en SPSS
+
+1. **File > Open > Data** → Seleccionar `ancova_dataset.csv`
+2. Verificar tipos de variable (numérico vs string)
+3. Definir variables categóricas: `grupo`, `device`, `internet_connection`, `nivel_estudio`
+4. Ejecutar ANCOVA: **Analyze > General Linear Model > Univariate**
+   - Dependiente: `postest`
+   - Factor fijo: `grupo`
+   - Covariables: `pretest`, `edad`
+
 ---
 
-## File Structure
+## 14. Ética y Privacidad
+
+- **Pseudonimización** en exports (sin email)
+- **Sin PII en prompts**: Hash en `AIFeedback.prompt_hash`
+- **Transparencia UI**: Label "IA activa" (GE), política de datos
+- **Aprobación ética** requerida antes de recolección
+
+---
+
+## 15. Estructura de Archivos
 
 ```
 tesis_ai_math_app/
-├── frontend/          # React + Tailwind (CRA)
+├── frontend/          # React + Tailwind
 ├── backend/           # Express + Prisma + TypeScript
 │   └── prisma/        # Schema, migrations, seeds
 ├── ai_module/         # FastAPI (Python)
-├── designs/           # UI mocks (HTML + PNG)
-├── dev.sh             # One-shot dev launcher
-└── README.md          # This documentation
+├── designs/           # UI mocks
+├── dev.sh             # Lanzador dev
+└── README.md
 ```
