@@ -28,6 +28,25 @@ const decodeJwt = (token: string): User | null => {
   }
 };
 
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const parsed = JSON.parse(jsonPayload) as Record<string, unknown>;
+    const exp = Number(parsed.exp);
+    if (!exp) return false;
+    return Date.now() >= exp * 1000;
+  } catch {
+    return true;
+  }
+};
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -116,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const token = localStorage.getItem('token');
 
     const initialise = async () => {
-      if (token) {
+      if (token && !isTokenExpired(token)) {
         const decodedUser = decodeJwt(token);
         if (decodedUser) {
           setIsAuthenticated(true);
@@ -132,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDefaultStudyStatus();
         }
       } else {
+        if (token) localStorage.removeItem('token');
         setDefaultAssessmentStatus();
         setDefaultStudyStatus();
       }

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.tsx';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 import Login from './pages/Login.tsx';
 import Register from './pages/Register.tsx';
 import Dashboard from './pages/Dashboard.tsx';
@@ -57,7 +58,8 @@ const ProtectedRoute = ({ children, skipPretestCheck = false, requirePosttestUnl
 function App() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
@@ -150,6 +152,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </div>
   );
 }

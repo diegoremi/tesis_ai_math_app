@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../services/api.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -19,6 +19,8 @@ interface AssessmentItem {
   options: Array<{ key: string; label: string }>;
 }
 
+const ASSESSMENT_DURATION_MINUTES = 20;
+
 const IntroductoryTest = () => {
   const navigate = useNavigate();
   const { refreshAssessmentStatus } = useAuth();
@@ -29,6 +31,8 @@ const IntroductoryTest = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(ASSESSMENT_DURATION_MINUTES * 60);
+  const [tabSwitches, setTabSwitches] = useState(0);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -48,6 +52,70 @@ const IntroductoryTest = () => {
     fetchItems();
   }, []);
 
+  // Timer
+  useEffect(() => {
+    if (loading || submitted) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          void handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [loading, submitted]);
+
+  // Anti-copy
+  useEffect(() => {
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      alert('La copia esta deshabilitada durante la evaluacion.');
+    };
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitches((prev) => prev + 1);
+      }
+    };
+
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  const handleAutoSubmit = useCallback(async () => {
+    if (submitting || submitted) return;
+    setSubmitting(true);
+    try {
+      const responses = items.map((item) => ({
+        item_id: item.item_id,
+        answer: answers[item.item_id] ?? null,
+      }));
+      await createAssessment({
+        assessment_type: 'pretest',
+        test_version: 'v1',
+        responses,
+      });
+      await refreshAssessmentStatus();
+      setSubmitted(true);
+    } catch {
+      setError('El tiempo se agoto pero no pudimos guardar tus respuestas.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [items, answers, submitting, submitted, refreshAssessmentStatus]);
+
   const currentQuestion = items[step];
   const optionList = Array.isArray(currentQuestion?.options) ? currentQuestion.options : [];
 
@@ -55,6 +123,12 @@ const IntroductoryTest = () => {
     if (items.length === 0) return 0;
     return Math.round(((step + 1) / items.length) * 100);
   }, [step, items.length]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const handleInput = (value: string) => {
     if (!currentQuestion) return;
@@ -109,6 +183,11 @@ const IntroductoryTest = () => {
           <p className="mt-4 text-base text-gray-400">
             Guardamos tus resultados. Ahora las practicas y recomendaciones se adaptaran a tu nivel.
           </p>
+          {tabSwitches > 0 && (
+            <p className="mt-2 text-xs text-yellow-400">
+              Se detectaron {tabSwitches} cambios de pestana durante la evaluacion.
+            </p>
+          )}
           <button
             type="button"
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition"
@@ -129,22 +208,35 @@ const IntroductoryTest = () => {
     );
   }
 
+  const timeWarning = timeLeft < 300; // less than 5 minutes
+
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-50">
-      <header className="flex flex-col gap-4 border-b border-gray-800 px-8 py-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-col gap-2 text-white">
-          <span className="text-lg font-bold">AI Math App</span>
-          <div className="text-xs uppercase tracking-[0.35em] text-gray-400">
-            <span>Evaluacion inicial - Pretest diagnostico</span>
+    <div
+      className="min-h-screen bg-gray-950 text-gray-50 select-none"
+      onCopy={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <header className="flex flex-col gap-4 border-b border-gray-800 px-4 md:px-8 py-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-lg font-bold">AI Math App</span>
+            <span className="text-xs uppercase tracking-[0.35em] text-gray-400">Evaluacion inicial - Pretest diagnostico</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className={`text-sm font-mono font-bold px-3 py-1 rounded-full ${timeWarning ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-300'}`}>
+              {formatTime(timeLeft)}
+            </div>
+            {tabSwitches > 0 && (
+              <span className="text-xs text-yellow-400">Cambios de pestana: {tabSwitches}</span>
+            )}
           </div>
         </div>
-        <span className="text-sm text-gray-400">Tiempo estimado: 15 minutos</span>
       </header>
 
-      <main className="px-6 py-12 flex justify-center">
-        <div className="w-full max-w-2xl bg-gray-900/60 rounded-2xl border border-gray-800 shadow-2xl p-8 space-y-8">
+      <main className="px-4 md:px-6 py-8 md:py-12 flex justify-center">
+        <div className="w-full max-w-2xl bg-gray-900/60 rounded-2xl border border-gray-800 shadow-2xl p-6 md:p-8 space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight text-white">Pregunta {step + 1} de {items.length}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Pregunta {step + 1} de {items.length}</h2>
             <p className="text-sm text-gray-400">Responde sin ayuda externa. Esto nos ayuda a personalizar el plan.</p>
           </div>
 
@@ -154,7 +246,7 @@ const IntroductoryTest = () => {
               <span className="text-emerald-400 font-semibold">{progress}%</span>
             </div>
             <div className="h-2 w-full rounded-full bg-gray-700 overflow-hidden">
-              <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }}></div>
+              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }}></div>
             </div>
           </div>
 
@@ -172,7 +264,8 @@ const IntroductoryTest = () => {
                       : 'border-gray-700 bg-gray-900 hover:border-emerald-500/60'
                   }`}
                 >
-                  {toSuperscript(option.label ?? option)}
+                  <span className="font-bold mr-2">{option.key}.</span>
+                  {toSuperscript(option.label)}
                 </button>
               ))}
             </div>
