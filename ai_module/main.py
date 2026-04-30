@@ -1,13 +1,12 @@
-
 import os
 import json
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import google.generativeai as genai
 from mangum import Mangum
 
@@ -18,25 +17,28 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 if API_KEY:
     genai.configure(api_key=API_KEY)
 
+
 class ChatMessage(BaseModel):
-    message: str
+    message: str = Field(..., max_length=2000)
+
 
 class ExercisePrompt(BaseModel):
-    prompt: str
+    prompt: str = Field(..., max_length=3000)
 
 
 class HintRequest(BaseModel):
-    stem: str
+    stem: str = Field(..., max_length=2000)
     options: Optional[List[dict]] = None
-    domain: Optional[str] = None
-    competency: Optional[str] = None
+    domain: Optional[str] = Field(None, max_length=100)
+    competency: Optional[str] = Field(None, max_length=100)
+    hint_level: int = Field(0, ge=0, le=3)
 
 
 class TheoryModuleRequest(BaseModel):
     participantProfile: Dict[str, Any]
     pretestSummary: Optional[Dict[str, Any]] = None
-    reflection: Optional[str] = None
-    moduleIndex: int = 0
+    reflection: Optional[str] = Field(None, max_length=2000)
+    moduleIndex: int = Field(0, ge=0)
 
 
 def has_gemini_key() -> bool:
@@ -50,33 +52,67 @@ PII_PATTERNS = [
 ]
 
 
+ASSESSMENT_KEYWORDS = [
+    "pretest", "postest", "evaluacion", "examen", "test",
+    "respuesta correcta", "cual es la respuesta", "dame la respuesta",
+    "solucion completa", "resuelveme esto", "dime la opcion",
+]
+
+
 def redact(text: str) -> str:
     redacted = text
     for pattern in PII_PATTERNS:
         redacted = re.sub(pattern, "[REDACTED]", redacted)
     return redacted
 
+
+def contains_assessment_content(text: str) -> bool:
+    text_lower = text.lower()
+    return any(keyword in text_lower for keyword in ASSESSMENT_KEYWORDS)
+
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
 
 @app.post("/chat")
 def chat(chat_message: ChatMessage):
     if not has_gemini_key():
         return {"response": "I currently cannot reach the AI service, but keep practicing—consistency is key!"}
 
+    redacted_message = redact(chat_message.message)
+
+    if contains_assessment_content(redacted_message):
+        return {
+            "response": (
+                "No puedo ayudarte con preguntas de evaluaciones o exámenes. "
+                "Soy tu tutor para práctica y comprensión de conceptos. "
+                "Si tienes dudas sobre cómo resolver un tipo de problema o necesitas "
+                "repasar un concepto, con gusto te guío paso a paso."
+            )
+        }
+
     try:
         model = genai.GenerativeModel(
             'gemini-2.0-flash-lite',
             system_instruction=(
-                "You are a helpful math tutor for young adults (18+). "
-                "Provide concise explanations, actionable hints, and motivation."
+                "Eres un tutor de matemáticas para adultos jóvenes (18+). "
+                "Tu rol es guiar el aprendizaje, NO dar respuestas directas a problemas. "
+                "REGLAS ESTRICTAS:\n"
+                "1. NUNCA respondas preguntas de evaluaciones, exámenes o tests.\n"
+                "2. NUNCA des la respuesta numérica final de un ejercicio.\n"
+                "3. SIEMPRE guía con preguntas reflexivas y sugerencias de estrategia.\n"
+                "4. Usa un tono claro, motivador y adulto.\n"
+                "5. Explica conceptos con ejemplos relacionados, no resolviendo el ejercicio exacto del estudiante.\n"
+                "6. Si el estudiante pide la respuesta, redirige: 'Vamos a descomponer el problema juntos. ¿Qué información tienes?'"
             ),
         )
-        response = model.generate_content(redact(chat_message.message))
+        response = model.generate_content(redacted_message)
         return {"response": response.text}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+
 
 @app.post("/generate_exercise")
 def generate_exercise(exercise_prompt: ExercisePrompt):
@@ -87,6 +123,7 @@ def generate_exercise(exercise_prompt: ExercisePrompt):
         }
 
     try:
+        redacted_prompt = redact(exercise_prompt.prompt)
         model = genai.GenerativeModel(
             'gemini-2.0-flash-lite',
             system_instruction=(
@@ -94,7 +131,7 @@ def generate_exercise(exercise_prompt: ExercisePrompt):
                 "based on the user's request. Provide JSON: {\"question\": ..., \"answer\": ...}."
             ),
         )
-        response = model.generate_content(exercise_prompt.prompt)
+        response = model.generate_content(redacted_prompt)
         return json.loads(response.text)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
@@ -106,7 +143,7 @@ def generate_hint(request: HintRequest):
         raise HTTPException(status_code=400, detail="stem is required for hint generation")
 
     if not has_gemini_key():
-        return {"hint": "Focus on identifying known values and isolate the variable step by step."}
+        return {"hint": _fallback_hint(request.hint_level)}
 
     option_text = ""
     if request.options:
@@ -116,9 +153,37 @@ def generate_hint(request: HintRequest):
     domain_text = f"Domain: {request.domain}." if request.domain else ""
     competency_text = f" Competency: {request.competency}." if request.competency else ""
 
+    hint_instructions = {
+        0: (
+            "Da una pista muy general sobre la estrategia a usar. "
+            "NO menciones números específicos del problema. "
+            "NO des la respuesta. "
+            "Solo sugiere qué concepto o método aplicar."
+        ),
+        1: (
+            "Da una pista más específica sobre el primer paso. "
+            "Puedes mencionar qué operación o fórmula usar. "
+            "NO des la respuesta final. "
+            "NO resuelvas el problema completo."
+        ),
+        2: (
+            "Guía sobre el siguiente paso concreto. "
+            "Menciona qué valores usar y cómo organizarlos. "
+            "NO des la respuesta final. "
+            "Solo orienta el procedimiento."
+        ),
+        3: (
+            "Da una pista muy detallada sobre el procedimiento, paso a paso. "
+            "Puedes mostrar la operación parcial. "
+            "NO des la respuesta final explícita. "
+            "Deja que el estudiante complete el último paso."
+        ),
+    }
+
+    instruction = hint_instructions.get(request.hint_level, hint_instructions[0])
+
     prompt = (
-        "Provide a succinct hint (not the full solution) to help a student solve the following math problem. "
-        "The hint should encourage the next step without revealing the answer.\n"
+        f"{instruction}\n"
         f"Problem: {redact(request.stem)}\n"
         f"{option_text}\n"
         f"{domain_text}{competency_text}\n"
@@ -128,12 +193,25 @@ def generate_hint(request: HintRequest):
     try:
         model = genai.GenerativeModel(
             'gemini-2.0-flash-lite',
-            system_instruction="You deliver short, actionable math hints without giving the solution away.",
+            system_instruction=(
+                "You deliver short, actionable math hints without giving the solution away. "
+                "You NEVER reveal the final answer. You guide the student to discover it themselves."
+            ),
         )
         response = model.generate_content(prompt)
-        return {"hint": response.text.strip() if response.text else "Try breaking the problem into simpler steps."}
+        return {"hint": response.text.strip() if response.text else _fallback_hint(request.hint_level)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+
+
+def _fallback_hint(hint_level: int) -> str:
+    hints = {
+        0: "Piensa en qué concepto matemático se aplica aquí. ¿Reconoces el tipo de problema?",
+        1: "Identifica los datos conocidos y lo que te piden encontrar. Luego busca la relación entre ellos.",
+        2: "Aplica la fórmula o método correspondiente paso a paso. Verifica cada operación.",
+        3: "Realiza la operación principal y verifica si tu resultado tiene sentido en el contexto del problema.",
+    }
+    return hints.get(hint_level, hints[0])
 
 
 @app.post("/generate/theory-module")
@@ -158,7 +236,7 @@ def generate_theory_module(payload: TheoryModuleRequest):
             "pretest": payload.pretestSummary,
             "reflection": redact(payload.reflection or "") if payload.reflection else None,
             "moduleIndex": module_index,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         model = genai.GenerativeModel('gemini-2.0-flash-lite', system_instruction=system_prompt)
@@ -194,8 +272,8 @@ def _fallback_theory_module(payload: TheoryModuleRequest) -> Dict[str, Any]:
     }.get(level, "Fundamentos matemáticos")
 
     rand_seed = profile.get("age", 20) + payload.moduleIndex
-    random.seed(rand_seed)
-    offset = random.randint(1, 5)
+    rng = random.Random(rand_seed)
+    offset = rng.randint(1, 5)
 
     return {
         "moduleId": f"fallback-{payload.moduleIndex}",
@@ -227,7 +305,7 @@ def _fallback_theory_module(payload: TheoryModuleRequest) -> Dict[str, Any]:
                     "data": [
                         {
                             "x": [0, 1, 2, 3, 4],
-                            "y": [random.randint(1, 4) + offset * i for i in range(5)],
+                            "y": [rng.randint(1, 4) + offset * i for i in range(5)],
                             "type": "scatter",
                             "mode": "lines+markers",
                             "name": "Progreso estimado",

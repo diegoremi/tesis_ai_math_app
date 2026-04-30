@@ -82,8 +82,8 @@ export const getAssessmentItems = (params: { type?: string; version?: string }) 
 // AI
 export const chat = (message: string) =>
   apiClient.post('/ai/chat', { message });
-export const getHint = (exerciseId: number) =>
-  apiClient.post('/ai/hint', { exerciseId });
+export const getHint = (exerciseId: number, hintLevel = 0) =>
+  apiClient.post('/ai/hint', { exerciseId, hintLevel });
 
 // Survey
 export const submitSurvey = (surveyData: Record<string, unknown>) =>

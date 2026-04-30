@@ -197,7 +197,10 @@ export const mapDomainToTopic = (domain: string | null | undefined): Topic => {
 };
 
 const selectDifficulty = (accuracy: number | null | undefined): Difficulty => {
-  if (accuracy !== undefined && accuracy !== null && accuracy >= 0.6) {
+  if (accuracy === undefined || accuracy === null) {
+    return "basico";
+  }
+  if (accuracy >= 0.8) {
     return "medio";
   }
   return "basico";
@@ -421,23 +424,41 @@ const gatherContext = async (userId: number): Promise<GenerationContext> => {
     },
   });
 
+  const practiceAttempts = await prisma.practiceAttempt.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: "desc" },
+    take: 50,
+  });
+
   const puntaje_pretest = pretest?.total_score ?? 0;
-  const dominios_debiles = computeWeakDomains(pretest?.responses ?? []);
+
+  const allResponses = [
+    ...(pretest?.responses ?? []),
+    ...practiceAttempts.map((a) => ({
+      is_correct: a.correct,
+      item: { domain: a.domain },
+    })),
+  ];
+
+  const dominios_debiles = computeWeakDomains(allResponses);
   const topic = dominios_debiles[0] ?? "aritmética";
 
-  const accuracy = (() => {
-    if (!pretest || !pretest.responses.length) {
-      return null;
+  const recentAccuracy = (() => {
+    if (!practiceAttempts.length) {
+      if (!pretest || !pretest.responses.length) return null;
+      const total = pretest.responses.length;
+      const correct = pretest.responses.reduce(
+        (acc, curr) => acc + (curr.is_correct ? 1 : 0),
+        0
+      );
+      return total ? correct / total : null;
     }
-    const total = pretest.responses.length;
-    const correct = pretest.responses.reduce(
-      (acc, curr) => acc + (curr.is_correct ? 1 : 0),
-      0
-    );
+    const total = practiceAttempts.length;
+    const correct = practiceAttempts.filter((a) => a.correct).length;
     return total ? correct / total : null;
   })();
 
-  const difficulty = selectDifficulty(accuracy);
+  const difficulty = selectDifficulty(recentAccuracy);
 
   return {
     userId,

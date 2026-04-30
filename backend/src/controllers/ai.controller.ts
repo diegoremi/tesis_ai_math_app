@@ -67,9 +67,12 @@ export const hintController = async (req: AuthenticatedRequest, res: Response) =
 
   await ensureChatbotAccess(userId, req.user?.role);
 
-  const { exerciseId } = req.body;
+  const { exerciseId, hintLevel = 0 } = req.body;
   if (typeof exerciseId !== 'number') {
     throw new AppError('exerciseId (number) is required', 400);
+  }
+  if (typeof hintLevel !== 'number' || hintLevel < 0 || hintLevel > 3) {
+    throw new AppError('hintLevel must be a number between 0 and 3', 400);
   }
 
   let item = await getStoredPracticeItem(exerciseId);
@@ -98,6 +101,7 @@ export const hintController = async (req: AuthenticatedRequest, res: Response) =
     options: item.options,
     domain: item.domain,
     competency: item.competency,
+    hint_level: hintLevel,
   };
 
   const aiResponse = await axios.post(`${AI_SERVICE_URL}/hint`, payload);

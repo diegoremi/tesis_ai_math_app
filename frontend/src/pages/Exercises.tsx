@@ -10,6 +10,7 @@ const Exercises = () => {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [hintLevel, setHintLevel] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,7 @@ const Exercises = () => {
     setError(null);
     setResult(null);
     setHint(null);
+    setHintLevel(0);
     setAnswer('');
     try {
       const res = await getExercise();
@@ -55,8 +57,9 @@ const Exercises = () => {
   const handleHint = async () => {
     if (!exercise) return;
     try {
-      const res = await getHint(exercise.id as number);
-      setHint((res.data as { hint?: string }).hint ?? 'Aquí tienes una pista...');
+      const res = await getHint(exercise.id as number, hintLevel);
+      setHint((res.data as { hint?: string }).hint ?? 'Aqui tienes una pista...');
+      setHintLevel((prev) => Math.min(prev + 1, 3));
     } catch {
       setError('No pudimos obtener la pista.');
     }
