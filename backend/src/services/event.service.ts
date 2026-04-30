@@ -1,6 +1,5 @@
-import { PrismaClient, EventType, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { EventType, Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 
 interface EventPayload {
   event_type: EventType | string;

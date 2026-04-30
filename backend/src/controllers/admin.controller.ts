@@ -1,9 +1,8 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { PrismaClient, type SurveySubmission, type SurveyResponse, type SurveyItem, AssignmentGroup, AssignmentMethod } from '@prisma/client';
+import { type SurveySubmission, type SurveyResponse, type SurveyItem, AssignmentGroup, AssignmentMethod } from '@prisma/client';
 import { Parser } from 'json2csv';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 const EDUCATION_LEVEL_MAP: Record<string, string> = {
   high_school: 'secundaria',
@@ -138,8 +137,23 @@ export const exportDataController = async (req: AuthenticatedRequest, res: Respo
 
     switch (dataType) {
       case 'users':
-        data = await prisma.user.findMany();
-        fields = ['user_id', 'first_name', 'last_name', 'email', 'age', 'education_level', 'goal', 'role', 'created_at'];
+        data = await prisma.user.findMany({
+          select: {
+            user_id: true,
+            participant_code: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            age: true,
+            education_level: true,
+            goal: true,
+            role: true,
+            gender: true,
+            math_level: true,
+            created_at: true,
+          },
+        });
+        fields = ['user_id', 'participant_code', 'first_name', 'last_name', 'email', 'age', 'education_level', 'goal', 'role', 'gender', 'math_level', 'created_at'];
         filename = 'users.csv';
         break;
       case 'activities':
@@ -359,8 +373,8 @@ const buildAncovaDataset = async () => {
       const attemptCorrect = participant.practiceAttempts.filter(a => a.correct).length;
 
       // Combinar métricas (priorizar PracticeSummary > Activity > PracticeAttempt)
-      const totalCorrect = summaryCorrect || activityCorrect || attemptCorrect;
-      const totalAttempts = summaryAttempts || activityAttempts || attemptCount;
+      const totalCorrect = summaryCorrect ?? activityCorrect ?? attemptCorrect;
+      const totalAttempts = summaryAttempts ?? activityAttempts ?? attemptCount;
       const exercisesSolved = totalCorrect;
       const accuracy = totalAttempts > 0 ? Number((totalCorrect / totalAttempts).toFixed(2)) : null;
 

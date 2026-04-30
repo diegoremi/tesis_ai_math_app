@@ -1,14 +1,12 @@
 import axios from "axios";
 import crypto from "crypto";
 import {
-  PrismaClient,
   AssessmentType,
   EducationLevel,
   PracticeItemStatus,
   DifficultyLevel,
 } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 const logPractice = (...args: unknown[]) => {
   console.log("[practice]", ...args);
@@ -682,6 +680,10 @@ export const submitPracticeAnswer = async (
   });
   if (!record) {
     throw new Error("Practice item not found");
+  }
+
+  if (record.user_id !== userId) {
+    throw new Error("Unauthorized: practice item belongs to another user");
   }
 
   const item = record.item_json as PracticeItem;

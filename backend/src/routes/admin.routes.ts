@@ -14,7 +14,7 @@ const router = Router();
 
 // All admin routes require authentication and admin role
 router.use(authenticateToken);
-router.use(authorizeRole(['admin', 'facilitator']));
+router.use(authorizeRole(['admin']));
 
 router.get('/users', getUsersController);
 router.get('/activities', getAllActivitiesController);

@@ -186,7 +186,7 @@ model Consent {
 
 model Assignment {
   assignment_id Int              @id @default(autoincrement())
-  user_id       Int
+  user_id       Int              @unique
   group         AssignmentGroup
   method        AssignmentMethod
   seed          String?          @db.VarChar(50)
@@ -231,7 +231,7 @@ model AssessmentResponse {
   created_at    DateTime @default(now())
 
   assessment Assessment     @relation(fields: [assessment_id], references: [assessment_id], onDelete: Cascade)
-  item       AssessmentItem @relation(fields: [item_id], references: [item_id])
+  item       AssessmentItem @relation(fields: [item_id], references: [item_id], onDelete: Cascade)
 
   @@index([assessment_id])
   @@index([item_id])
@@ -272,7 +272,7 @@ model SurveyResponse {
   created_at           DateTime @default(now())
 
   submission SurveySubmission @relation(fields: [survey_submission_id], references: [survey_submission_id], onDelete: Cascade)
-  item       SurveyItem       @relation(fields: [survey_item_id], references: [survey_item_id])
+  item       SurveyItem       @relation(fields: [survey_item_id], references: [survey_item_id], onDelete: Cascade)
 
   @@index([survey_submission_id])
   @@index([survey_item_id])

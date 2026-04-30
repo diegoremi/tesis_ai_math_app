@@ -1,6 +1,5 @@
-import { PrismaClient, AssignmentGroup, AssignmentMethod } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { AssignmentGroup, AssignmentMethod } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 
 export interface ConsentPayload {
   documentVersion: string;
@@ -59,14 +58,14 @@ export const autoAssignParticipant = async (userId: number) => {
     return existingAssignment;
   }
 
-  const [geCount, gcCount] = await Promise.all([
-    prisma.assignment.count({ where: { group: AssignmentGroup.GE } }),
-    prisma.assignment.count({ where: { group: AssignmentGroup.GC } }),
-  ]);
-
-  const nextGroup = geCount <= gcCount ? AssignmentGroup.GE : AssignmentGroup.GC;
-
   const assignment = await prisma.$transaction(async (tx) => {
+    const [geCount, gcCount] = await Promise.all([
+      tx.assignment.count({ where: { group: AssignmentGroup.GE } }),
+      tx.assignment.count({ where: { group: AssignmentGroup.GC } }),
+    ]);
+
+    const nextGroup = geCount <= gcCount ? AssignmentGroup.GE : AssignmentGroup.GC;
+
     const createdAssignment = await tx.assignment.create({
       data: {
         user_id: userId,

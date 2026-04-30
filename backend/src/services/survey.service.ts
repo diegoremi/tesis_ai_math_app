@@ -1,6 +1,5 @@
-import { PrismaClient, SurveyInstrument, SurveyTimepoint } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { SurveyInstrument, SurveyTimepoint } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 
 interface SurveyResponseInput {
   survey_item_id: number;

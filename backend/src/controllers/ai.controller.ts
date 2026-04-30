@@ -2,12 +2,11 @@ import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import axios from 'axios';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
 import { getStoredPracticeItem, mapDomainToTopic } from '../services/practice.service.js';
 import { getPracticeItemById } from '../services/planner.service.js';
+import { prisma } from '../lib/prisma.js';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://localhost:8001';
-const prisma = new PrismaClient();
 
 const hashPrompt = (payload: unknown) => {
   const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});

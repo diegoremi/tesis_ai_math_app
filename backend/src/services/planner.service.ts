@@ -1,8 +1,7 @@
-import { PrismaClient, DifficultyLevel } from '@prisma/client';
+import { DifficultyLevel } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 
 const PRACTICE_VERSION = 'practice_v1';
-
-const prisma = new PrismaClient();
 
 type PracticeOption = { key: string; label: string };
 

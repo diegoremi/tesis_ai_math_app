@@ -1,7 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 export const createActivity = async (userId: number, activityData: any) => {
   const { activity_type, difficulty_level, attempts, correct_answers, status } = activityData;

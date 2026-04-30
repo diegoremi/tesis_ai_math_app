@@ -1,8 +1,7 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { logEvent } from './event.service.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 const logTheory = (...args: unknown[]) => {
   console.log('[theory]', ...args);
@@ -804,7 +803,7 @@ export const submitTheoryCheckpoint = async (userId: number, payload: TheoryChec
       },
     },
     update: {
-      checkpoint_passed: passed || undefined,
+      checkpoint_passed: passed,
     },
     create: {
       module_id: moduleId,

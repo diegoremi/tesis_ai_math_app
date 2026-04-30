@@ -1,6 +1,7 @@
 import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import userRoutes from './routes/user.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import activityRoutes from './routes/activity.routes.js';
@@ -16,6 +17,24 @@ import logger from './utils/logger.js';
 const app: Express = express();
 
 app.use(helmet());
+app.use(express.json({ limit: '100kb' }));
+
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { message: 'Too many authentication attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const aiRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: { message: 'Too many AI requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -31,7 +50,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all for now
+      callback(new Error('Not allowed by CORS'), false);
     }
   },
   credentials: true,
@@ -39,14 +58,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
 }));
-app.use(express.json());
 app.use(requestLogger);
 
 app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRateLimit, authRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/evaluations', evaluationRoutes);
-app.use('/api/ai', aiRoutes);
+app.use('/api/ai', aiRateLimit, aiRoutes);
 app.use('/api/survey', surveyRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/study', studyRoutes);

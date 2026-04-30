@@ -1,12 +1,11 @@
 
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { autoAssignParticipant } from './study.service.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 export const createUserService = async (userData: any) => {
-  const { first_name, last_name, email, password, age, education_level, goal, role = 'student', gender, math_level } = userData;
+  const { first_name, last_name, email, password, age, education_level, goal, gender, math_level } = userData;
+  const role = 'student';
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -71,7 +70,16 @@ export const getUserById = async (userId: number) => {
 };
 
 export const updateUserService = async (userId: number, userData: any) => {
-  const { password, ...dataToUpdate } = userData;
+  const { password, role, participant_code, email, ...rest } = userData;
+
+  const dataToUpdate: Record<string, unknown> = {};
+
+  const allowedFields = ['first_name', 'last_name', 'age', 'education_level', 'goal', 'gender', 'math_level'];
+  for (const field of allowedFields) {
+    if (rest[field] !== undefined) {
+      dataToUpdate[field] = rest[field];
+    }
+  }
 
   if (password) {
     dataToUpdate.password_hash = await bcrypt.hash(password, 10);

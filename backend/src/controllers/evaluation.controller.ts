@@ -35,6 +35,9 @@ export const getAssessmentsController = async (req: AuthenticatedRequest, res: R
 export const getAssessmentByIdController = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const assessmentId = Number.parseInt(req.params.id ?? '', 10);
+    if (Number.isNaN(assessmentId)) {
+      return res.status(400).json({ message: 'Invalid assessment ID' });
+    }
     const assessment = await getAssessmentById(assessmentId);
     if (!assessment) {
       return res.status(404).json({ message: 'Assessment not found' });
@@ -53,6 +56,9 @@ export const getAssessmentByIdController = async (req: AuthenticatedRequest, res
 export const updateAssessmentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const assessmentId = Number.parseInt(req.params.id ?? '', 10);
+    if (Number.isNaN(assessmentId)) {
+      return res.status(400).json({ message: 'Invalid assessment ID' });
+    }
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in token' });
@@ -78,6 +84,9 @@ export const updateAssessmentController = async (req: AuthenticatedRequest, res:
 export const deleteAssessmentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const assessmentId = Number.parseInt(req.params.id ?? '', 10);
+    if (Number.isNaN(assessmentId)) {
+      return res.status(400).json({ message: 'Invalid assessment ID' });
+    }
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(400).json({ message: 'User ID not found in token' });
@@ -103,6 +112,10 @@ export const deleteAssessmentController = async (req: AuthenticatedRequest, res:
 export const getAssessmentItemsController = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const assessmentType = (req.query.type as string | undefined) ?? 'pretest';
+    const validTypes = ['pretest', 'posttest'];
+    if (!validTypes.includes(assessmentType)) {
+      return res.status(400).json({ message: 'Invalid assessment type. Must be pretest or posttest' });
+    }
     const version = req.query.version as string | undefined;
     const items = await listAssessmentItems(assessmentType as AssessmentType, version);
     res.status(200).json({ items });
