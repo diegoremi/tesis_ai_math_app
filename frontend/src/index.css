@@ -1,12 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  --primary-color: #38e07b;
-}
 
 body {
   margin: 0;
@@ -20,24 +14,4 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
-}
-
-.material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px; /* Preferred icon size */
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-feature-settings: 'liga';
-  -webkit-font-smoothing: antialiased;
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
 }

@@ -54,10 +54,10 @@ function start_backend() {
 }
 
 function start_frontend() {
-  echo "[frontend] starting npm start..."
+  echo "[frontend] starting npm run dev..."
   cd "$ROOT_DIR/frontend"
   npm install
-  npm start
+  npm run dev
 }
 
 ensure_backend_env

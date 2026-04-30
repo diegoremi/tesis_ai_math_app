@@ -61,7 +61,8 @@ npm run dev               # nodemon + tsx en puerto 8080
 ```bash
 cd frontend
 npm install
-npm start                 # CRA dev server en puerto 3000
+npm run dev               # Vite dev server en puerto 3000
+npm run build             # Build de produccion
 ```
 
 ### AI Module
