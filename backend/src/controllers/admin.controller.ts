@@ -3,6 +3,15 @@ import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { type SurveySubmission, type SurveyResponse, type SurveyItem, AssignmentGroup, AssignmentMethod } from '@prisma/client';
 import { Parser } from 'json2csv';
 import { prisma } from '../lib/prisma.js';
+import { AppError } from '../middleware/errorHandler.js';
+
+function validateIdParam(param: string | undefined): number {
+  const id = Number.parseInt(param ?? '', 10);
+  if (Number.isNaN(id)) {
+    throw new AppError('Invalid ID parameter', 400);
+  }
+  return id;
+}
 
 const EDUCATION_LEVEL_MAP: Record<string, string> = {
   high_school: 'secundaria',
@@ -73,233 +82,194 @@ const sumFromMetadata = (events: { metadata: unknown }[], keys: string[]) => {
 };
 
 export const getUsersController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        user_id: true,
-        first_name: true,
-        last_name: true,
-        email: true,
-        role: true,
-        created_at: true,
-        featureFlag: {
-          select: {
-            chatbot: true,
-            adaptativo: true,
-          },
-        },
-        assignments: {
-          orderBy: { assigned_at: 'desc' },
-          take: 1,
-          select: {
-            group: true,
-            assigned_at: true,
-            method: true,
-          },
+  const users = await prisma.user.findMany({
+    select: {
+      user_id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      role: true,
+      created_at: true,
+      featureFlag: {
+        select: {
+          chatbot: true,
+          adaptativo: true,
         },
       },
-      orderBy: { created_at: 'desc' },
-    });
-    res.status(200).json(users);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching users' });
-  }
+      assignments: {
+        orderBy: { assigned_at: 'desc' },
+        take: 1,
+        select: {
+          group: true,
+          assigned_at: true,
+          method: true,
+        },
+      },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+  res.status(200).json(users);
 };
 
 export const getActivitiesController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const activities = await prisma.activity.findMany();
-    res.status(200).json(activities);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching activities' });
-  }
+  const activities = await prisma.activity.findMany();
+  res.status(200).json(activities);
 };
 
 export const getAssessmentsController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const assessments = await prisma.assessment.findMany();
-    res.status(200).json(assessments);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching assessments' });
-  }
+  const assessments = await prisma.assessment.findMany();
+  res.status(200).json(assessments);
 };
 
 export const exportDataController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const dataType = req.query.type as string;
-    const outputFormat = (req.query.format as string | undefined)?.toLowerCase();
-    let data: any[] = [];
-    let fields: string[] = [];
-    let filename = 'export.csv';
+  const dataType = req.query.type as string;
+  const outputFormat = (req.query.format as string | undefined)?.toLowerCase();
+  let data: unknown[] = [];
+  let fields: string[] = [];
+  let filename = 'export.csv';
 
-    switch (dataType) {
-      case 'users':
-        data = await prisma.user.findMany({
-          select: {
-            user_id: true,
-            participant_code: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-            age: true,
-            education_level: true,
-            goal: true,
-            role: true,
-            gender: true,
-            math_level: true,
-            created_at: true,
-          },
-        });
-        fields = ['user_id', 'participant_code', 'first_name', 'last_name', 'email', 'age', 'education_level', 'goal', 'role', 'gender', 'math_level', 'created_at'];
-        filename = 'users.csv';
-        break;
-      case 'activities':
-        data = await prisma.activity.findMany();
-        fields = ['activity_id', 'user_id', 'activity_type', 'difficulty_level', 'attempts', 'correct_answers', 'status', 'created_at'];
-        filename = 'activities.csv';
-        break;
-      case 'assessments':
-        data = await prisma.assessment.findMany();
-        fields = ['assessment_id', 'user_id', 'assessment_type', 'total_score', 'created_at'];
-        filename = 'assessments.csv';
-        break;
-      case 'ancova':
-        data = await buildAncovaDataset();
-        fields = [
-          'id_usuario',
-          'grupo',
-          'pretest',
-          'postest',
-          'tam_utilidad',
-          'tam_facilidad',
-          'mot_pre',
-          'mot_post',
-          'auto_pre',
-          'auto_post',
-          'device',
-          'internet_connection',
-          'sesiones_semana',
-          'minutos_totales',
-          'ejercicios_resueltos',
-          'porc_aciertos',
-          'edad',
-          'nivel_estudio',
-        ];
-        filename = 'ancova_dataset.csv';
-        break;
-      default:
-        return res.status(400).json({ message: 'Invalid data type for export' });
-    }
-
-    if (dataType === 'ancova' && outputFormat === 'json') {
-      return res.status(200).json({ rows: data, generatedAt: new Date().toISOString() });
-    }
-
-    const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(data);
-
-    res.header('Content-Type', 'text/csv');
-    res.attachment(filename);
-    res.send(csv);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error exporting data' });
+  switch (dataType) {
+    case 'users':
+      data = await prisma.user.findMany({
+        select: {
+          user_id: true,
+          participant_code: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          age: true,
+          education_level: true,
+          goal: true,
+          role: true,
+          gender: true,
+          math_level: true,
+          created_at: true,
+        },
+      });
+      fields = ['user_id', 'participant_code', 'first_name', 'last_name', 'email', 'age', 'education_level', 'goal', 'role', 'gender', 'math_level', 'created_at'];
+      filename = 'users.csv';
+      break;
+    case 'activities':
+      data = await prisma.activity.findMany();
+      fields = ['activity_id', 'user_id', 'activity_type', 'difficulty_level', 'attempts', 'correct_answers', 'status', 'created_at'];
+      filename = 'activities.csv';
+      break;
+    case 'assessments':
+      data = await prisma.assessment.findMany();
+      fields = ['assessment_id', 'user_id', 'assessment_type', 'total_score', 'created_at'];
+      filename = 'assessments.csv';
+      break;
+    case 'ancova':
+      data = await buildAncovaDataset();
+      fields = [
+        'id_usuario',
+        'grupo',
+        'pretest',
+        'postest',
+        'tam_utilidad',
+        'tam_facilidad',
+        'mot_pre',
+        'mot_post',
+        'auto_pre',
+        'auto_post',
+        'device',
+        'internet_connection',
+        'sesiones_semana',
+        'minutos_totales',
+        'ejercicios_resueltos',
+        'porc_aciertos',
+        'edad',
+        'nivel_estudio',
+      ];
+      filename = 'ancova_dataset.csv';
+      break;
+    default:
+      throw new AppError('Invalid data type for export', 400);
   }
+
+  if (dataType === 'ancova' && outputFormat === 'json') {
+    return res.status(200).json({ rows: data, generatedAt: new Date().toISOString() });
+  }
+
+  const json2csvParser = new Parser({ fields });
+  const csv = json2csvParser.parse(data);
+
+  res.header('Content-Type', 'text/csv');
+  res.attachment(filename);
+  res.send(csv);
 };
 
 export const exportAncovaDatasetController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const dataset = await buildAncovaDataset();
-    res.status(200).json({ rows: dataset, generatedAt: new Date().toISOString() });
-  } catch (error) {
-    console.error('Error building ANCOVA dataset', error);
-    res.status(500).json({ message: 'Error building ANCOVA dataset' });
-  }
+  const dataset = await buildAncovaDataset();
+  res.status(200).json({ rows: dataset, generatedAt: new Date().toISOString() });
 };
 
 export const exportFullReportController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const report = await buildFullReport();
-    res.status(200).json(report);
-  } catch (error) {
-    console.error('Error building full report', error);
-    res.status(500).json({ message: 'Error building full report' });
-  }
+  const report = await buildFullReport();
+  res.status(200).json(report);
 };
 
 export const updateFeatureFlagsAdminController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ message: 'Solo el personal administrador puede modificar los flags' });
-    }
-
-    const userId = Number.parseInt(req.params.userId ?? '', 10);
-    if (Number.isNaN(userId)) {
-      return res.status(400).json({ message: 'Invalid user id' });
-    }
-
-    const { chatbot, adaptativo } = req.body ?? {};
-    if (typeof chatbot !== 'boolean' && typeof adaptativo !== 'boolean') {
-      return res.status(400).json({ message: 'Provide at least one flag to update' });
-    }
-
-    let assignment = await prisma.assignment.findFirst({
-      where: { user_id: userId },
-      orderBy: { assigned_at: 'desc' },
-    });
-
-    const existingFlags = await prisma.featureFlag.findUnique({ where: { user_id: userId } });
-    const nextAdaptativo = typeof adaptativo === 'boolean' ? adaptativo : existingFlags?.adaptativo ?? false;
-    const nextChatbot = typeof chatbot === 'boolean' ? chatbot : existingFlags?.chatbot ?? false;
-
-    let targetGroup = assignment?.group ?? null;
-
-    if (typeof adaptativo === 'boolean') {
-      targetGroup = nextAdaptativo ? AssignmentGroup.GE : AssignmentGroup.GC;
-      if (assignment) {
-        assignment = await prisma.assignment.update({
-          where: { assignment_id: assignment.assignment_id },
-          data: {
-            group: targetGroup,
-          },
-        });
-      } else {
-        assignment = await prisma.assignment.create({
-          data: {
-            user_id: userId,
-            group: targetGroup,
-            method: AssignmentMethod.emparejamiento,
-            seed: 'admin-toggle',
-          },
-        });
-      }
-    }
-
-    const updatedFlags = await prisma.featureFlag.upsert({
-      where: { user_id: userId },
-      update: {
-        chatbot: nextChatbot,
-        adaptativo: nextAdaptativo,
-      },
-      create: {
-        user_id: userId,
-        chatbot: nextChatbot,
-        adaptativo: nextAdaptativo,
-      },
-    });
-
-    res.status(200).json({
-      featureFlag: updatedFlags,
-      assignment: assignment?.group ?? targetGroup,
-    });
-  } catch (error) {
-    console.error('updateFeatureFlagsAdminController', error);
-    res.status(500).json({ message: 'Error updating feature flags' });
+  if (req.user?.role !== 'admin') {
+    throw new AppError('Solo el personal administrador puede modificar los flags', 403);
   }
+
+  const userId = validateIdParam(req.params.userId);
+
+  const { chatbot, adaptativo } = req.body ?? {};
+  if (typeof chatbot !== 'boolean' && typeof adaptativo !== 'boolean') {
+    throw new AppError('Provide at least one flag to update', 400);
+  }
+
+  let assignment = await prisma.assignment.findFirst({
+    where: { user_id: userId },
+    orderBy: { assigned_at: 'desc' },
+  });
+
+  const existingFlags = await prisma.featureFlag.findUnique({ where: { user_id: userId } });
+  const nextAdaptativo = typeof adaptativo === 'boolean' ? adaptativo : existingFlags?.adaptativo ?? false;
+  const nextChatbot = typeof chatbot === 'boolean' ? chatbot : existingFlags?.chatbot ?? false;
+
+  let targetGroup = assignment?.group ?? null;
+
+  if (typeof adaptativo === 'boolean') {
+    targetGroup = nextAdaptativo ? AssignmentGroup.GE : AssignmentGroup.GC;
+    if (assignment) {
+      assignment = await prisma.assignment.update({
+        where: { assignment_id: assignment.assignment_id },
+        data: {
+          group: targetGroup,
+        },
+      });
+    } else {
+      assignment = await prisma.assignment.create({
+        data: {
+          user_id: userId,
+          group: targetGroup,
+          method: AssignmentMethod.emparejamiento,
+          seed: 'admin-toggle',
+        },
+      });
+    }
+  }
+
+  const updatedFlags = await prisma.featureFlag.upsert({
+    where: { user_id: userId },
+    update: {
+      chatbot: nextChatbot,
+      adaptativo: nextAdaptativo,
+    },
+    create: {
+      user_id: userId,
+      chatbot: nextChatbot,
+      adaptativo: nextAdaptativo,
+    },
+  });
+
+  res.status(200).json({
+    featureFlag: updatedFlags,
+    assignment: assignment?.group ?? targetGroup,
+  });
 };
 
 const buildAncovaDataset = async () => {
@@ -359,20 +329,16 @@ const buildAncovaDataset = async () => {
       const autoPre = autonomyPre ? average(numericResponses(autonomyPre)) : null;
       const autoPost = autonomyPost ? average(numericResponses(autonomyPost)) : null;
 
-      // Uso desde Activity (legacy)
       const activityCorrect = participant.activities.reduce((sum, activity) => sum + (activity.correct_answers ?? 0), 0);
       const activityAttempts = participant.activities.reduce((sum, activity) => sum + (activity.attempts ?? 0), 0);
 
-      // Uso desde PracticeSummary (nuevo sistema)
       const summaryCorrect = participant.practiceSummaries.reduce((sum, s) => sum + (s.correct_count ?? 0), 0);
       const summaryAttempts = participant.practiceSummaries.reduce((sum, s) => sum + (s.attempt_count ?? 0), 0);
       const summaryMinutes = participant.practiceSummaries.reduce((sum, s) => sum + ((s.duration_seconds ?? 0) / 60), 0);
 
-      // Uso desde PracticeAttempt (fallback directo)
       const attemptCount = participant.practiceAttempts.length;
       const attemptCorrect = participant.practiceAttempts.filter(a => a.correct).length;
 
-      // Combinar métricas (priorizar PracticeSummary > Activity > PracticeAttempt)
       const totalCorrect = summaryCorrect ?? activityCorrect ?? attemptCorrect;
       const totalAttempts = summaryAttempts ?? activityAttempts ?? attemptCount;
       const exercisesSolved = totalCorrect;
@@ -398,7 +364,7 @@ const buildAncovaDataset = async () => {
         'duracionSeg',
         'duration',
       ]);
-      // Usar PracticeSummary si disponible, sino metadata de events
+
       const totalMinutes = summaryMinutes > 0
         ? Math.round(summaryMinutes)
         : Number((totalDurationSeconds / 60).toFixed(0));
@@ -409,7 +375,7 @@ const buildAncovaDataset = async () => {
         id_usuario: participant.participant_code,
         grupo: assignment?.group ?? null,
         pretest: pretest?.total_score ?? null,
-        postest: postest?.total_score ?? null,
+        postest: postest.total_score ?? null,
         tam_utilidad: tamUtilidad,
         tam_facilidad: tamFacilidad,
         mot_pre: motPre,
@@ -454,7 +420,7 @@ const buildFullReport = async () => {
     return acc;
   }, new Map<string, { rows: typeof dataset }>());
 
-  const average = (values: Array<number | null | undefined>) => {
+  const averageFn = (values: Array<number | null | undefined>) => {
     const filtered = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     if (!filtered.length) {
       return null;
@@ -464,14 +430,14 @@ const buildFullReport = async () => {
 
   const groupPerformance = Array.from(groupBuckets.entries()).map(([group, bucket]) => {
     const rows = bucket.rows;
-    const pre = average(rows.map((row) => row.pretest));
-    const post = average(rows.map((row) => row.postest));
+    const pre = averageFn(rows.map((row) => row.pretest));
+    const post = averageFn(rows.map((row) => row.postest));
     const delta = pre !== null && post !== null ? Number((post - pre).toFixed(2)) : null;
-    const tamUtilidad = average(rows.map((row) => row.tam_utilidad));
-    const tamFacilidad = average(rows.map((row) => row.tam_facilidad));
-    const motivation = average(rows.map((row) => row.mot_post));
-    const autonomy = average(rows.map((row) => row.auto_post));
-    const sessions = average(rows.map((row) => row.sesiones_semana));
+    const tamUtilidad = averageFn(rows.map((row) => row.tam_utilidad));
+    const tamFacilidad = averageFn(rows.map((row) => row.tam_facilidad));
+    const motivation = averageFn(rows.map((row) => row.mot_post));
+    const autonomy = averageFn(rows.map((row) => row.auto_post));
+    const sessions = averageFn(rows.map((row) => row.sesiones_semana));
 
     return {
       group,
@@ -500,7 +466,7 @@ const buildFullReport = async () => {
 
     const subscales = Array.from(bucket.entries()).map(([subscale, values]) => ({
       subscale,
-      average: average(values),
+      average: averageFn(values),
     }));
 
     return {

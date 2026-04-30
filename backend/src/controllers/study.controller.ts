@@ -12,110 +12,99 @@ import {
   submitTheoryCheckpoint,
   getStudyStatus,
 } from '../services/theory.service.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 export const submitConsentController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-
-    const consent = await recordConsent(userId, req.body);
-    res.status(201).json(consent);
-  } catch (error) {
-    console.error('submitConsentController', error);
-    res.status(500).json({ message: 'Error recording consent' });
+  const userId = req.user?.userId;
+  if (!userId) {
+    throw new AppError('User ID not found in token', 400);
   }
+
+  const { documentVersion, accepted } = req.body;
+  if (!documentVersion || typeof accepted !== 'boolean') {
+    throw new AppError('documentVersion and accepted (boolean) are required', 400);
+  }
+
+  const consent = await recordConsent(userId, { documentVersion, accepted });
+  res.status(201).json(consent);
 };
 
 export const randomizeParticipantsController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const result = await randomizeParticipants(req.body);
-    res.status(200).json(result);
-  } catch (error) {
-    console.error('randomizeParticipantsController', error);
-    res.status(500).json({ message: 'Error randomizing participants' });
-  }
+  const result = await randomizeParticipants(req.body);
+  res.status(200).json(result);
 };
 
 export const getFeatureFlagsController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-
-    const flags = await getFeatureFlagsForUser(userId);
-    res.status(200).json(flags);
-  } catch (error) {
-    console.error('getFeatureFlagsController', error);
-    res.status(500).json({ message: 'Error retrieving feature flags' });
+  const userId = req.user?.userId;
+  if (!userId) {
+    throw new AppError('User ID not found in token', 400);
   }
+
+  const flags = await getFeatureFlagsForUser(userId);
+  res.status(200).json(flags);
 };
 
 export const getRandomizationSummaryController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const summary = await getRandomizationSummary();
-    res.status(200).json(summary);
-  } catch (error) {
-    console.error('getRandomizationSummaryController', error);
-    res.status(500).json({ message: 'Error fetching randomization summary' });
-  }
+  const summary = await getRandomizationSummary();
+  res.status(200).json(summary);
 };
 
 export const generateTheoryModuleController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-
-    const module = await generateTheoryModule(userId, req.body ?? {});
-    res.status(200).json(module);
-  } catch (error) {
-    console.error('generateTheoryModuleController', error);
-    res.status(500).json({ message: 'Error generating theory module' });
+  const userId = req.user?.userId;
+  if (!userId) {
+    throw new AppError('User ID not found in token', 400);
   }
+
+  const { moduleIndex } = req.body ?? {};
+  if (moduleIndex !== undefined && (!Number.isInteger(moduleIndex) || moduleIndex < 0)) {
+    throw new AppError('moduleIndex must be a non-negative integer', 400);
+  }
+
+  const module = await generateTheoryModule(userId, req.body ?? {});
+  res.status(200).json(module);
 };
 
 export const recordTheoryProgressController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-    const progress = await updateTheoryProgress(userId, req.body ?? {});
-    res.status(200).json(progress);
-  } catch (error) {
-    console.error('recordTheoryProgressController', error);
-    res.status(500).json({ message: 'Error recording theory progress' });
+  const userId = req.user?.userId;
+  if (!userId) {
+    throw new AppError('User ID not found in token', 400);
   }
+
+  const { moduleId, progress } = req.body ?? {};
+  if (!moduleId || typeof moduleId !== 'number') {
+    throw new AppError('moduleId (number) is required', 400);
+  }
+  if (progress === undefined || typeof progress !== 'number' || progress < 0 || progress > 1) {
+    throw new AppError('progress must be a number between 0 and 1', 400);
+  }
+
+  const progressRecord = await updateTheoryProgress(userId, req.body ?? {});
+  res.status(200).json(progressRecord);
 };
 
 export const submitTheoryCheckpointController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-    const result = await submitTheoryCheckpoint(userId, req.body ?? {});
-    res.status(200).json(result);
-  } catch (error) {
-    console.error('submitTheoryCheckpointController', error);
-    res.status(500).json({ message: 'Error validating theory checkpoint' });
+  const userId = req.user?.userId;
+  if (!userId) {
+    throw new AppError('User ID not found in token', 400);
   }
+
+  const { moduleId, answers } = req.body ?? {};
+  if (!moduleId || typeof moduleId !== 'number') {
+    throw new AppError('moduleId (number) is required', 400);
+  }
+  if (!Array.isArray(answers) || answers.length === 0) {
+    throw new AppError('answers must be a non-empty array', 400);
+  }
+
+  const result = await submitTheoryCheckpoint(userId, req.body ?? {});
+  res.status(200).json(result);
 };
 
 export const getStudyStatusController = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID not found in token' });
-    }
-    const status = await getStudyStatus(userId);
-    res.status(200).json(status);
-  } catch (error) {
-    console.error('getStudyStatusController', error);
-    res.status(500).json({ message: 'Error fetching study status' });
+  const userId = req.user?.userId;
+  if (!userId) {
+    throw new AppError('User ID not found in token', 400);
   }
+  const status = await getStudyStatus(userId);
+  res.status(200).json(status);
 };

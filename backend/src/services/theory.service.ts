@@ -31,7 +31,7 @@ type StaticModuleBlueprint = {
       id: string;
       stem: string;
       options: Array<{ key: string; label: string }>;
-      correct: string;
+      correct?: string;
     }>;
   };
 };
@@ -471,6 +471,18 @@ const STATIC_MODULE_LIBRARY: StaticModuleBlueprint[] = [
   },
 ];
 
+function stripCheckpointAnswers(blueprint: StaticModuleBlueprint): StaticModuleBlueprint {
+  const stripped = JSON.parse(JSON.stringify(blueprint)) as StaticModuleBlueprint;
+  if (stripped.checkpoint?.questions) {
+    stripped.checkpoint.questions = stripped.checkpoint.questions.map((q) => ({
+      id: q.id,
+      stem: q.stem,
+      options: q.options,
+    }));
+  }
+  return stripped;
+}
+
 const buildStaticModule = (moduleIndex: number, reason: 'control' | 'fallback', payload?: TheoryModuleRequest) => {
   const blueprint = STATIC_MODULE_LIBRARY[moduleIndex % STATIC_MODULE_LIBRARY.length];
   const clone = JSON.parse(JSON.stringify(blueprint)) as StaticModuleBlueprint;
@@ -489,13 +501,15 @@ const buildStaticModule = (moduleIndex: number, reason: 'control' | 'fallback', 
       ? ' Material autoguiado con ejemplos resueltos.'
       : ' Contenido disponible mientras restablecemos el tutor IA.';
 
+  const strippedCheckpoint = stripCheckpointAnswers(clone);
+
   return {
     moduleId: `${reason}-${moduleIndex}`,
     version: reason === 'control' ? 'control-v1' : 'fallback',
     title: clone.title,
     description: `${baseDescription}${descriptionSuffix}`,
     sections: clone.sections,
-    checkpoint: clone.checkpoint,
+    checkpoint: strippedCheckpoint.checkpoint,
   };
 };
 
