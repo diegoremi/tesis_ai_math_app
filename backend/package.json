@@ -25,7 +25,6 @@
     "jsonwebtoken": "^9.0.2",
     "prisma": "^6.16.3",
     "serverless-http": "^4.0.0",
-    "tsx": "^4.20.5",
     "winston": "^3.18.3"
   },
   "devDependencies": {
@@ -36,6 +35,7 @@
     "@vercel/node": "^5.5.4",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }
 }

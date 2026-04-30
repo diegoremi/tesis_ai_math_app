@@ -19,6 +19,14 @@ function ensure_ai_env() {
   fi
 }
 
+function check_port() {
+  local port=$1
+  if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "ERROR: Port $port is already in use."
+    return 1
+  fi
+}
+
 function start_ai_module() {
   echo "[ai_module] starting uvicorn..."
   local activate_script
@@ -41,21 +49,23 @@ function start_ai_module() {
 function start_backend() {
   echo "[backend] starting npm run dev..."
   cd "$ROOT_DIR/backend"
-  npm install >/dev/null 2>&1
+  npm install
   npm run dev
 }
 
 function start_frontend() {
   echo "[frontend] starting npm start..."
   cd "$ROOT_DIR/frontend"
-  npm install >/dev/null 2>&1
+  npm install
   npm start
 }
 
 ensure_backend_env
 ensure_ai_env
 
-trap 'kill 0' EXIT
+check_port 8001
+check_port 8080
+check_port 3000
 
 (
   cd "$ROOT_DIR/ai_module"
@@ -75,7 +85,15 @@ BE_PID=$!
 ) &
 FE_PID=$!
 
-echo "\nServices launched:"
+cleanup() {
+  echo ""
+  echo "Shutting down services..."
+  kill "$AI_PID" "$BE_PID" "$FE_PID" 2>/dev/null || true
+  wait
+}
+trap cleanup EXIT INT TERM
+
+printf "\nServices launched:\n"
 echo "  AI module PID:   $AI_PID (http://localhost:8001)"
 echo "  Backend PID:     $BE_PID (http://localhost:8080)"
 echo "  Frontend PID:    $FE_PID (http://localhost:3000)"
