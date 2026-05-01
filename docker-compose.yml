@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tesis_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tesis
+      POSTGRES_PASSWORD: tesis_secret
+      POSTGRES_DB: tesis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tesis -d tesis_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tesis_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgresql://tesis:tesis_secret@postgres:5432/tesis_db?sslmode=disable
+      DIRECT_URL: postgresql://tesis:tesis_secret@postgres:5432/tesis_db?sslmode=disable
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      AI_SERVICE_URL: http://ai_module:8001
+      AI_PROVIDER: gemini
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
+
+  ai_module:
+    build:
+      context: ./ai_module
+      dockerfile: Dockerfile
+    container_name: tesis_ai
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - ./ai_module:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tesis_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

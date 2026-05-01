@@ -56,5 +56,9 @@ dist/
 frontend/build/
 backend/dist/
 
+# Docker
+.dockerignore
+docker-compose.override.yml
+
 # Hosting/CI
 .vercel/

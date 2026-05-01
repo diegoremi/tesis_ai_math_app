@@ -18,6 +18,11 @@ if API_KEY:
     genai.configure(api_key=API_KEY)
 
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "ai_module"}
+
+
 class ChatMessage(BaseModel):
     message: str = Field(..., max_length=2000)
 
