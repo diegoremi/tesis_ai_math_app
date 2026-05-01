@@ -17,6 +17,9 @@ import logger from './utils/logger.js';
 
 const app: Express = express();
 
+// Trust proxy headers from Render/Vercel (required for express-rate-limit behind a reverse proxy)
+app.set('trust proxy', 1);
+
 // CORS must be applied before any other middleware to ensure preflight responses include headers
 app.use(cors({
   origin: (origin, callback) => {
