@@ -122,7 +122,7 @@ const Register = () => {
                 className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 bg-[#29382f]"
               />
               <span className="text-white text-sm">
-                Acepto los <button type="button" onClick={() => navigate('/terms')} className="text-emerald-400 underline hover:text-emerald-300">términos y condiciones</button> del estudio
+                Acepto los términos y condiciones del estudio
               </span>
             </label>
             {recaptchaSiteKey ? (
