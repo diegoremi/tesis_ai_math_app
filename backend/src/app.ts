@@ -13,8 +13,36 @@ import studyRoutes from './routes/study.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import { requestLogger } from './middleware/errorLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import logger from './utils/logger.js';
 
 const app: Express = express();
+
+// CORS must be applied before any other middleware to ensure preflight responses include headers
+app.use(cors({
+  origin: (origin, callback) => {
+    logger.info(`CORS check for origin: ${origin || 'none'}`);
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      'https://tesis-ai-math-app.vercel.app',
+      'https://tesis-ai-math-app-diegoremis-projects.vercel.app',
+      'https://tesis-ai-math-app-git-main-diegoremis-projects.vercel.app',
+      'http://localhost:3000'
+    ];
+
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'), false);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200
+}));
 
 app.use(helmet());
 app.use(express.json({ limit: '100kb' }));
@@ -34,30 +62,6 @@ const aiRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = [
-      'https://tesis-ai-math-app.vercel.app',
-      'https://tesis-ai-math-app-diegoremis-projects.vercel.app',
-      'https://tesis-ai-math-app-git-main-diegoremis-projects.vercel.app',
-      'http://localhost:3000'
-    ];
-
-    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'), false);
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  optionsSuccessStatus: 200
-}));
 app.use(requestLogger);
 
 app.use('/api/users', userRoutes);
