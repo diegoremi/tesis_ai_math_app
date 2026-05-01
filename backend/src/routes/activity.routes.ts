@@ -1,6 +1,7 @@
 
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
+import { requireConsent, requirePretestCompletion } from '../middleware/study.middleware.js';
 import {
   createActivityController,
   getActivitiesController,
@@ -15,6 +16,8 @@ const router = Router();
 
 // All activity routes require authentication
 router.use(authenticateToken);
+router.use(requireConsent);
+router.use(requirePretestCompletion);
 
 router.get('/exercise', getExerciseController);
 router.post('/exercise/submit', submitAnswerController);

@@ -4,8 +4,12 @@ import { autoAssignParticipant } from './study.service.js';
 import { prisma } from '../lib/prisma.js';
 
 export const createUserService = async (userData: any) => {
-  const { first_name, last_name, email, password, age, education_level, goal, gender, math_level } = userData;
+  const { first_name, last_name, email, password, age, education_level, goal, gender, math_level, agree_terms } = userData;
   const role = 'student';
+
+  if (!agree_terms) {
+    throw new Error('User must agree to terms and conditions');
+  }
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
