@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../services/api.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { TM, TMFrame, TMBtn, FONT_MONO } from '../components/terminal';
 
 const SUPERSCRIPT_MAP: Record<string, string> = {
   '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
@@ -44,7 +45,7 @@ const IntroductoryTest = () => {
         setAnswers({});
         setStep(0);
       } catch {
-        setError('No pudimos cargar las preguntas del pretest. Intenta nuevamente.');
+        setError('no pudimos cargar las preguntas del pretest. intentá de nuevo.');
       } finally {
         setLoading(false);
       }
@@ -66,27 +67,18 @@ const IntroductoryTest = () => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [loading, submitted]);
+  }, [loading, submitted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Anti-copy
   useEffect(() => {
-    const handleCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      alert('La copia esta deshabilitada durante la evaluacion.');
-    };
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
+    const handleCopy = (e: ClipboardEvent) => { e.preventDefault(); };
+    const handleContextMenu = (e: MouseEvent) => { e.preventDefault(); };
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setTabSwitches((prev) => prev + 1);
-      }
+      if (document.hidden) setTabSwitches((prev) => prev + 1);
     };
-
     document.addEventListener('copy', handleCopy);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('contextmenu', handleContextMenu);
@@ -102,15 +94,11 @@ const IntroductoryTest = () => {
         item_id: item.item_id,
         answer: answers[item.item_id] ?? null,
       }));
-      await createAssessment({
-        assessment_type: 'pretest',
-        test_version: 'v1',
-        responses,
-      });
+      await createAssessment({ assessment_type: 'pretest', test_version: 'v1', responses });
       await refreshAssessmentStatus();
       setSubmitted(true);
     } catch {
-      setError('El tiempo se agoto pero no pudimos guardar tus respuestas.');
+      setError('el tiempo se agotó y no pudimos guardar tus respuestas.');
     } finally {
       setSubmitting(false);
     }
@@ -135,13 +123,8 @@ const IntroductoryTest = () => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.item_id]: value }));
   };
 
-  const handleNext = () => {
-    if (step < items.length - 1) setStep(step + 1);
-  };
-
-  const handlePrev = () => {
-    if (step > 0) setStep(step - 1);
-  };
+  const handleNext = () => { if (step < items.length - 1) setStep(step + 1); };
+  const handlePrev = () => { if (step > 0) setStep(step - 1); };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -151,164 +134,188 @@ const IntroductoryTest = () => {
         item_id: item.item_id,
         answer: answers[item.item_id] ?? null,
       }));
-
-      await createAssessment({
-        assessment_type: 'pretest',
-        test_version: 'v1',
-        responses,
-      });
-
+      await createAssessment({ assessment_type: 'pretest', test_version: 'v1', responses });
       await refreshAssessmentStatus();
       setSubmitted(true);
     } catch {
-      setError('No pudimos guardar tus respuestas. Intenta nuevamente.');
+      setError('no pudimos guardar tus respuestas. intentá de nuevo.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const timeWarning = timeLeft < 300;
+
+  // ─── estados ───────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
+      <TMFrame title="mathlab" subtitle="~/pretest">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)' }}>
+          <span style={{ fontSize: 12, color: TM.dim }}>$ cargando preguntas…</span>
+        </div>
+      </TMFrame>
     );
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center px-6">
-        <div className="max-w-lg w-full bg-gray-900 rounded-3xl border border-gray-800 p-12 text-center shadow-2xl">
-          <h1 className="text-3xl font-bold tracking-tight">Pretest completado!</h1>
-          <p className="mt-4 text-base text-gray-400">
-            Guardamos tus resultados. Ahora las practicas y recomendaciones se adaptaran a tu nivel.
-          </p>
-          {tabSwitches > 0 && (
-            <p className="mt-2 text-xs text-yellow-400">
-              Se detectaron {tabSwitches} cambios de pestana durante la evaluacion.
+      <TMFrame title="mathlab" subtitle="~/pretest/done">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)', padding: 36 }}>
+          <div style={{ width: 440, maxWidth: '100%' }}>
+            <div style={{ fontSize: 12, color: TM.dim, marginBottom: 14 }}>$ ./pretest --calibrate</div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: TM.fg, margin: '0 0 8px' }}>
+              <span style={{ color: TM.green }}>[x]</span> pretest completado
+            </h1>
+            <p style={{ fontSize: 13, color: TM.dim, marginBottom: 22, lineHeight: 1.6 }}>
+              // guardamos tus resultados. las prácticas se adaptarán a tu nivel.
             </p>
-          )}
-          <button
-            type="button"
-            className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition"
-            onClick={() => navigate('/dashboard', { replace: true })}
-          >
-            Ir al panel
-          </button>
+            {tabSwitches > 0 && (
+              <div style={{ fontSize: 11, color: TM.amber, marginBottom: 16 }}>
+                warn → se detectaron {tabSwitches} cambios de pestaña durante la evaluación.
+              </div>
+            )}
+            <TMBtn kind="amber" onClick={() => navigate('/dashboard', { replace: true })}>
+              ./ir al panel →
+            </TMBtn>
+          </div>
         </div>
-      </div>
+      </TMFrame>
     );
   }
 
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">No hay preguntas disponibles en este momento.</p>
-      </div>
+      <TMFrame title="mathlab" subtitle="~/pretest">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)' }}>
+          <span style={{ fontSize: 12, color: TM.dim }}>// no hay preguntas disponibles en este momento.</span>
+        </div>
+      </TMFrame>
     );
   }
 
-  const timeWarning = timeLeft < 300; // less than 5 minutes
+  // ─── pantalla principal ────────────────────────────────────────
 
   return (
-    <div
-      className="min-h-screen bg-gray-950 text-gray-50 select-none"
-      onCopy={(e) => e.preventDefault()}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <header className="flex flex-col gap-4 border-b border-gray-800 px-4 md:px-8 py-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div className="flex flex-col gap-1">
-            <span className="text-lg font-bold">AI Math App</span>
-            <span className="text-xs uppercase tracking-[0.35em] text-gray-400">Evaluacion inicial - Pretest diagnostico</span>
+    <TMFrame title="mathlab" subtitle="~/pretest">
+      <div
+        style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 32px)' }}
+        onCopy={(e) => e.preventDefault()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {/* Header sticky */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 26px',
+          background: TM.panel,
+          borderBottom: `1px solid ${TM.rule}`,
+        }}>
+          <div style={{ fontSize: 12, color: TM.amber }}>
+            $ ./pretest --calibrate
+            <span style={{ color: TM.amber, animation: 'tm-blink 1.1s steps(1) infinite', marginLeft: 4 }}>▌</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className={`text-sm font-mono font-bold px-3 py-1 rounded-full ${timeWarning ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-300'}`}>
-              {formatTime(timeLeft)}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             {tabSwitches > 0 && (
-              <span className="text-xs text-yellow-400">Cambios de pestana: {tabSwitches}</span>
+              <span style={{ fontSize: 11, color: TM.amber }}>
+                warn → {tabSwitches} cambios de pestaña
+              </span>
             )}
+            <span style={{
+              fontSize: 13, fontWeight: 700, fontFamily: FONT_MONO,
+              color: timeWarning ? TM.red : TM.cyan,
+              padding: '2px 10px',
+              border: `1px solid ${timeWarning ? TM.red : TM.cyan}`,
+            }}>
+              {formatTime(timeLeft)}
+            </span>
           </div>
         </div>
-      </header>
 
-      <main className="px-4 md:px-6 py-8 md:py-12 flex justify-center">
-        <div className="w-full max-w-2xl bg-gray-900/60 rounded-2xl border border-gray-800 shadow-2xl p-6 md:p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Pregunta {step + 1} de {items.length}</h2>
-            <p className="text-sm text-gray-400">Responde sin ayuda externa. Esto nos ayuda a personalizar el plan.</p>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300 font-medium">Progreso</span>
-              <span className="text-emerald-400 font-semibold">{progress}%</span>
+        {/* Contenido scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '26px 26px 0' }}>
+          {/* Numeración y barra de progreso */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>
+              <span style={{ color: TM.amber }}>Q{step + 1}</span>
+              <span style={{ color: TM.dim }}> / {items.length}</span>
             </div>
-            <div className="h-2 w-full rounded-full bg-gray-700 overflow-hidden">
-              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 120, height: 4, background: TM.rule }}>
+                <div style={{ width: `${progress}%`, height: '100%', background: TM.amber }} />
+              </div>
+              <span style={{ fontSize: 11, color: TM.dim }}>{progress}%</span>
             </div>
           </div>
 
-          <section className="space-y-5">
-            <h3 className="text-lg font-semibold">{toSuperscript(currentQuestion.stem)}</h3>
-            <div className="grid gap-3">
-              {optionList.map((option) => (
+          {/* Enunciado */}
+          <div style={{
+            fontSize: 16, color: TM.fg, lineHeight: 1.65,
+            marginBottom: 22, padding: '14px 18px',
+            background: TM.panel, borderLeft: `2px solid ${TM.amber}`,
+            border: `1px solid ${TM.rule}`, borderLeftWidth: 2,
+          }}>
+            {toSuperscript(currentQuestion.stem)}
+          </div>
+
+          {/* Opciones */}
+          <div style={{ display: 'grid', gap: 8, marginBottom: 22 }}>
+            {optionList.map((option) => {
+              const selected = answers[currentQuestion.item_id] === (option.key ?? option.label);
+              return (
                 <button
                   key={option.key ?? option.label}
                   type="button"
                   onClick={() => handleInput(option.key ?? option.label)}
-                  className={`text-left rounded-xl border px-4 py-3 transition ${
-                    answers[currentQuestion.item_id] === (option.key ?? option.label)
-                      ? 'border-emerald-400 bg-emerald-500/10 text-white'
-                      : 'border-gray-700 bg-gray-900 hover:border-emerald-500/60'
-                  }`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px',
+                    background: selected ? 'rgba(255,180,84,0.08)' : TM.panel,
+                    border: `1px solid ${selected ? TM.amber : TM.rule}`,
+                    borderLeft: `2px solid ${selected ? TM.amber : TM.rule}`,
+                    cursor: 'pointer', fontFamily: FONT_MONO,
+                    color: TM.fg, fontSize: 14, textAlign: 'left',
+                  }}
                 >
-                  <span className="font-bold mr-2">{option.key}.</span>
+                  <span style={{ color: selected ? TM.amber : TM.dim, fontWeight: 700, flexShrink: 0 }}>
+                    {selected ? '[x]' : '[ ]'}
+                  </span>
+                  <span style={{ color: TM.amber, fontWeight: 700, flexShrink: 0 }}>{option.key}.</span>
                   {toSuperscript(option.label)}
                 </button>
-              ))}
-            </div>
-          </section>
+              );
+            })}
+          </div>
 
           {error && (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {error}
+            <div style={{ marginBottom: 16, fontSize: 12, color: TM.red }}>
+              <span style={{ color: TM.dim }}>err →</span> {error}
             </div>
           )}
-
-          <footer className="flex flex-col sm:flex-row gap-3 justify-between">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={step === 0 || submitting}
-              className="flex items-center justify-center gap-2 rounded-full border border-gray-700 px-6 py-2 text-sm font-semibold text-gray-200 disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            {step < items.length - 1 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition disabled:opacity-70"
-              >
-                Siguiente
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition disabled:opacity-70"
-              >
-                {submitting ? 'Enviando...' : 'Finalizar pretest'}
-              </button>
-            )}
-          </footer>
         </div>
-      </main>
-    </div>
+
+        {/* Footer */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '14px 26px',
+          borderTop: `1px solid ${TM.rule}`,
+          background: TM.bg,
+        }}>
+          <TMBtn kind="ghost" onClick={handlePrev} disabled={step === 0 || submitting}>
+            ./back
+          </TMBtn>
+          {step < items.length - 1 ? (
+            <TMBtn kind="amber" onClick={handleNext} disabled={submitting}>
+              ./next →
+            </TMBtn>
+          ) : (
+            <TMBtn kind="amber" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? './enviando…' : './submit --pretest →'}
+            </TMBtn>
+          )}
+        </div>
+      </div>
+    </TMFrame>
   );
 };
 

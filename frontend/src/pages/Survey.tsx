@@ -2,12 +2,20 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { getSurveyItems, submitSurvey } from '../services/api.ts';
+import { TM, TMFrame, TMNav, TMBox, TMBtn, TMPrompt, FONT_MONO } from '../components/terminal';
+
+const INSTRUMENTS = [
+  { id: 'tam', label: './tam' },
+  { id: 'motivacion', label: './motivacion' },
+  { id: 'autonomia', label: './autonomia' },
+];
 
 const Survey = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
   const [responses, setResponses] = useState<Record<number, number>>({});
+  const [openText, setOpenText] = useState('');
   const [instrument, setInstrument] = useState('tam');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -19,11 +27,12 @@ const Survey = () => {
     setError(null);
     setSuccess(false);
     setResponses({});
+    setOpenText('');
     try {
       const res = await getSurveyItems({ instrument: inst });
       setItems((res.data as { items?: Array<Record<string, unknown>> }).items ?? []);
     } catch {
-      setError('No pudimos cargar la encuesta.');
+      setError('no pudimos cargar la encuesta.');
     } finally {
       setLoading(false);
     }
@@ -36,10 +45,9 @@ const Survey = () => {
   const handleSubmit = async () => {
     const answeredItems = Object.keys(responses).length;
     if (answeredItems < items.length) {
-      setError('Por favor responde todas las preguntas antes de enviar.');
+      setError('respondé todas las preguntas antes de enviar.');
       return;
     }
-
     setSubmitting(true);
     setError(null);
     try {
@@ -53,90 +61,151 @@ const Survey = () => {
       await submitSurvey(payload);
       setSuccess(true);
     } catch {
-      setError('Error al enviar la encuesta.');
+      setError('error al enviar la encuesta.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0b1210]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
+  const handleNav = (id: string) => {
+    if (id === 'dash') navigate('/dashboard');
+    else if (id === 'theory') navigate('/theory');
+    else if (id === 'practice') navigate('/exercises');
+    else if (id === 'chatbot') navigate('/chatbot');
+    else if (id === 'profile') navigate('/profile');
+  };
 
   return (
-    <div className="min-h-screen bg-[#0b1210] text-white">
-      <nav className="flex items-center justify-between border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold">Encuestas</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="text-sm hover:text-emerald-400">Dashboard</button>
-          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300">Salir</button>
+    <TMFrame title="mathlab" subtitle="~/survey">
+      <TMNav onNav={handleNav} />
+      <main style={{ padding: 26, height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+        <TMPrompt>./survey --run</TMPrompt>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '14px 0 4px', color: TM.fg }}>
+          <span style={{ color: TM.amber }}>&gt;</span> encuesta
+        </h1>
+        <div style={{ fontSize: 11, color: TM.dim, marginBottom: 22 }}>
+          // tu opinión nos ayuda a mejorar la experiencia de aprendizaje
         </div>
-      </nav>
-      <main className="px-6 md:px-10 py-10 max-w-2xl mx-auto">
-        <div className="flex gap-3 mb-6">
-          {['tam', 'motivacion', 'autonomia'].map((inst) => (
+
+        {/* Selector de instrumento */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+          {INSTRUMENTS.map((inst) => (
             <button
-              key={inst}
-              onClick={() => setInstrument(inst)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                instrument === inst
-                  ? 'bg-emerald-500 text-black'
-                  : 'bg-[#101a17] border border-[#29382f] hover:border-emerald-500'
-              }`}
+              key={inst.id}
+              onClick={() => setInstrument(inst.id)}
+              style={{
+                background: instrument === inst.id ? TM.amber : TM.panel,
+                color: instrument === inst.id ? TM.bgDeep : TM.fg,
+                border: `1px solid ${instrument === inst.id ? TM.amber : TM.rule}`,
+                padding: '5px 14px',
+                fontFamily: FONT_MONO, fontSize: 12,
+                cursor: 'pointer', fontWeight: instrument === inst.id ? 700 : 400,
+              }}
             >
-              {inst === 'tam' ? 'TAM' : inst === 'motivacion' ? 'Motivación' : 'Autonomía'}
+              {instrument === inst.id ? '▸ ' : ''}{inst.label}
             </button>
           ))}
         </div>
 
-        {error && <p className="text-red-400 mb-4">{error}</p>}
-        {success && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6">
-            <p className="text-emerald-400 font-bold">Encuesta enviada correctamente.</p>
+        {error && (
+          <div style={{ marginBottom: 16, fontSize: 12, color: TM.red }}>
+            <span style={{ color: TM.dim }}>err →</span> {error}
           </div>
         )}
 
-        <div className="space-y-4">
-          {items.map((item) => {
-            const itemId = Number((item as { survey_item_id: number }).survey_item_id);
-            return (
-              <div key={itemId} className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                <p className="font-medium mb-4">{String((item as { statement: string }).statement ?? '')}</p>
-                <div className="flex justify-between gap-2">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      onClick={() => setResponses({ ...responses, [itemId]: value })}
-                      className={`flex-1 rounded-xl py-3 text-sm font-bold transition ${
-                        responses[itemId] === value
-                          ? 'bg-emerald-500 text-black'
-                          : 'bg-[#0b1612] border border-[#29382f] hover:border-emerald-500'
-                      }`}
-                    >
-                      {value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {items.length > 0 && !success && (
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full mt-6 rounded-full h-12 bg-emerald-500 text-black font-bold hover:opacity-90 transition disabled:opacity-60"
-          >
-            {submitting ? 'Enviando...' : 'Enviar encuesta'}
-          </button>
+        {success && (
+          <TMBox title="ENVIADO" accent={TM.green} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: TM.green }}>
+              <span>[x]</span> encuesta enviada correctamente. gracias por tu tiempo.
+            </div>
+          </TMBox>
         )}
+
+        {loading && (
+          <div style={{ fontSize: 12, color: TM.dim }}>$ cargando preguntas…</div>
+        )}
+
+        {!loading && !success && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 640 }}>
+            {items.map((item, idx) => {
+              const itemId = Number((item as { survey_item_id: number }).survey_item_id);
+              const accent = idx % 2 === 0 ? TM.amber : TM.cyan;
+              return (
+                <TMBox key={itemId} accent={accent}>
+                  <p style={{ fontSize: 13, color: TM.fg, marginBottom: 14, lineHeight: 1.5 }}>
+                    {String((item as { statement: string }).statement ?? '')}
+                  </p>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, color: TM.dim, marginRight: 4 }}>en desacuerdo</span>
+                    {[1, 2, 3, 4, 5].map((value) => {
+                      const selected = responses[itemId] === value;
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => setResponses({ ...responses, [itemId]: value })}
+                          style={{
+                            width: 36, height: 36,
+                            background: selected ? accent : TM.panel,
+                            color: selected ? TM.bgDeep : TM.dim,
+                            border: `1px solid ${selected ? accent : TM.rule}`,
+                            fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
+                    <span style={{ fontSize: 10, color: TM.dim, marginLeft: 4 }}>de acuerdo</span>
+                  </div>
+                </TMBox>
+              );
+            })}
+
+            {items.length > 0 && (
+              <>
+                {/* Pregunta abierta */}
+                <div>
+                  <label style={{ display: 'block' }}>
+                    <span style={{ fontSize: 10, color: TM.cyan, letterSpacing: 1.5 }}>
+                      &gt; comentario libre
+                    </span>
+                    <textarea
+                      value={openText}
+                      onChange={(e) => setOpenText(e.target.value)}
+                      placeholder="¿algo más que quieras compartir sobre tu experiencia?"
+                      rows={4}
+                      style={{
+                        display: 'block', width: '100%',
+                        boxSizing: 'border-box',
+                        background: TM.panel, color: TM.fg,
+                        border: `1px solid ${TM.rule}`,
+                        borderLeft: `2px solid ${TM.cyan}`,
+                        padding: '8px 12px', marginTop: 4,
+                        fontSize: 13, fontFamily: FONT_MONO,
+                        outline: 'none', borderRadius: 0, resize: 'vertical',
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+                  <TMBtn kind="amber" size="lg" onClick={handleSubmit} disabled={submitting}>
+                    {submitting ? './enviando…' : './submit --encuesta'}
+                  </TMBtn>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{ marginTop: 26, textAlign: 'right' }}>
+          <span onClick={logout} style={{ fontSize: 11, color: TM.dim, cursor: 'pointer' }}>
+            // ./logout
+          </span>
+        </div>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 

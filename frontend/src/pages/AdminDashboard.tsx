@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import {
@@ -7,6 +7,7 @@ import {
   getAnalytics,
   getParticipantProgress,
 } from '../services/api.ts';
+import { TM, TMFrame, TMBox, TMBtn, FONT_MONO } from '../components/terminal';
 
 interface AnalyticsData {
   overview: {
@@ -44,6 +45,58 @@ interface Participant {
   };
 }
 
+// ─── Sparkline SVG inline ──────────────────────────────────────
+const Sparkline = ({
+  values,
+  color,
+  width = 140,
+  height = 44,
+}: {
+  values: number[];
+  color: string;
+  width?: number;
+  height?: number;
+}) => {
+  if (values.length < 2) {
+    return <svg width={width} height={height}><line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke={TM.rule} strokeWidth={1} /></svg>;
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pad = 4;
+  const points = values
+    .map((v, i) => {
+      const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+      const y = pad + (1 - (v - min) / range) * (height - pad * 2);
+      return `${x},${y}`;
+    })
+    .join(' ');
+  const lastX = pad + (width - pad * 2);
+  const lastY = pad + (1 - (values[values.length - 1] - min) / range) * (height - pad * 2);
+  return (
+    <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
+      <circle cx={lastX} cy={lastY} r={3} fill={color} />
+    </svg>
+  );
+};
+
+// ─── Barra horizontal de salud ─────────────────────────────────
+const HealthBar = ({ label, pct, color }: { label: string; pct: number; color: string }) => (
+  <div style={{ marginBottom: 10 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+      <span style={{ color: TM.dim }}>{label}</span>
+      <span style={{ color, fontWeight: 700 }}>{pct}%</span>
+    </div>
+    <div style={{ height: 6, background: TM.rule }}>
+      <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color }} />
+    </div>
+  </div>
+);
+
+// ─── Color de mastery ──────────────────────────────────────────
+const masteryColor = (pct: number) => pct >= 70 ? TM.green : pct >= 40 ? TM.amber : TM.red;
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
@@ -52,33 +105,33 @@ const AdminDashboard = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'participants' | 'exports'>('overview');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [reportRes, analyticsRes, progressRes] = await Promise.all([
+        fetchAdminReport(),
+        getAnalytics(),
+        getParticipantProgress(),
+      ]);
+      setReport(reportRes.data as Record<string, unknown>);
+      setAnalytics(analyticsRes.data as AnalyticsData);
+      setParticipants(progressRes.data as Participant[]);
+    } catch {
+      setError('no pudimos cargar los datos del admin.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (user?.role !== 'admin') {
       navigate('/dashboard');
       return;
     }
-
-    const fetchData = async () => {
-      try {
-        const [reportRes, analyticsRes, progressRes] = await Promise.all([
-          fetchAdminReport(),
-          getAnalytics(),
-          getParticipantProgress(),
-        ]);
-        setReport(reportRes.data as Record<string, unknown>);
-        setAnalytics(analyticsRes.data as AnalyticsData);
-        setParticipants(progressRes.data as Participant[]);
-      } catch {
-        setError('No pudimos cargar los datos del admin.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [user, navigate]);
+  }, [user, navigate, fetchData]);
 
   const handleExport = async (type: string) => {
     try {
@@ -91,265 +144,244 @@ const AdminDashboard = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError('Error al exportar datos.');
+      setError('error al exportar datos.');
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0b1210]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
+      <TMFrame title="mathlab.admin" subtitle="~/admin/dashboard">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)' }}>
+          <span style={{ fontSize: 12, color: TM.dim }}>$ cargando datos…</span>
+        </div>
+      </TMFrame>
     );
   }
 
-  const groupPerformance = (report?.groupPerformance as Array<Record<string, unknown>>) ?? [];
   const overview = analytics?.overview;
+  const groupPerformance = (report?.groupPerformance as Array<Record<string, unknown>>) ?? [];
+  const ge = groupPerformance.find((g) => g.group === 'GE');
+  const gc = groupPerformance.find((g) => g.group === 'GC');
 
-  const getProgressColor = (step: boolean) =>
-    step ? 'bg-emerald-500' : 'bg-gray-600';
+  // KPI derivados
+  const totalUsers = overview?.totalParticipants ?? 0;
+  const totalSessions = participants.reduce((s, p) => s + p.exerciseCount, 0);
+  const avgMastery = analytics?.scores.posttestAverage ?? 0;
+  const completedCount = participants.filter((p) => p.progress.completed).length;
+  const dropoffPct = totalUsers > 0 ? Math.round(((totalUsers - completedCount) / totalUsers) * 100) : 0;
+
+  // Sparkline: use dailySignups as cumulative trend if available, else pre→post scores
+  const signupCounts = analytics?.dailySignups?.map((d) => d.count) ?? [];
+  const signupCumulative = signupCounts.reduce<number[]>((acc, v) => {
+    acc.push((acc[acc.length - 1] ?? 0) + v);
+    return acc;
+  }, []);
+  const geSparkline = signupCumulative.length >= 2
+    ? signupCumulative
+    : ge
+      ? [Number(ge.pretestAverage) || 0, Number(ge.posttestAverage) || 0]
+      : analytics?.scores ? [analytics.scores.pretestAverage, analytics.scores.posttestAverage] : [0, 0];
+  const gcSparkline = gc
+    ? [Number(gc.pretestAverage) || 0, Number(gc.posttestAverage) || 0]
+    : [0, 0];
+
+  // Tabla: últimos 6 participantes
+  const latest6 = [...participants]
+    .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+    .slice(0, 6);
+
+  // Study health
+  const pct = (n: number) => totalUsers > 0 ? Math.round((n / totalUsers) * 100) : 0;
+  const consentPct = pct(overview?.consentCount ?? 0);
+  const pretestPct = pct(overview?.pretestCount ?? 0);
+  const activePct = pct(participants.filter((p) => p.exerciseCount > 0).length);
+  const posttestPct = pct(overview?.posttestCount ?? 0);
+  const surveyPct = pct(completedCount);
 
   return (
-    <div className="min-h-screen bg-[#0b1210] text-white">
-      <nav className="flex items-center justify-between border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold">Admin Dashboard</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="text-sm hover:text-emerald-400">Volver</button>
-          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300">Salir</button>
+    <TMFrame title="mathlab.admin" subtitle="~/admin/dashboard">
+      {/* Sub-header ADMIN */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 22px',
+        background: TM.panel, borderBottom: `1px solid ${TM.rule}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: TM.amber, fontFamily: FONT_MONO }}>
+            ▒▓ ADMIN
+          </span>
+          <span style={{ fontSize: 11, color: TM.dim }}>
+            role: researcher · access: full
+          </span>
         </div>
-      </nav>
-
-      <main className="px-6 md:px-10 py-10 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Panel de administración</h1>
-        {error && <p className="text-red-400 mb-4">{error}</p>}
-
-        {/* Tabs */}
-        <div className="flex gap-4 mb-8 border-b border-[#29382f]">
-          {(['overview', 'participants', 'exports'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`pb-3 px-4 text-sm font-medium capitalize transition ${
-                activeTab === tab
-                  ? 'text-emerald-400 border-b-2 border-emerald-400'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {tab === 'overview' ? 'Resumen' : tab === 'participants' ? 'Participantes' : 'Exportar'}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <TMBtn kind="ghost" size="sm" onClick={fetchData}>./refresh</TMBtn>
+          <TMBtn kind="amber" size="sm" onClick={() => handleExport('ancova')}>./export csv</TMBtn>
+          <span
+            onClick={logout}
+            style={{ fontSize: 11, color: TM.dim, cursor: 'pointer', marginLeft: 8 }}
+          >
+            // ./logout
+          </span>
         </div>
+      </div>
 
-        {activeTab === 'overview' && (
-          <>
-            {/* Overview Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                <p className="text-xs text-[#6aa58e] uppercase">Total</p>
-                <p className="text-3xl font-bold">{overview?.totalParticipants ?? 0}</p>
-                <p className="text-xs text-gray-500 mt-1">participantes</p>
-              </div>
-              <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                <p className="text-xs text-[#6aa58e] uppercase">Consentimiento</p>
-                <p className="text-3xl font-bold">{overview?.consentCount ?? 0}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {overview?.totalParticipants ? Math.round((overview.consentCount / overview.totalParticipants) * 100) : 0}%
-                </p>
-              </div>
-              <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                <p className="text-xs text-[#6aa58e] uppercase">Pretest</p>
-                <p className="text-3xl font-bold">{overview?.pretestCount ?? 0}</p>
-                <p className="text-xs text-gray-500 mt-1">{overview?.pretestRate ?? 0}%</p>
-              </div>
-              <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                <p className="text-xs text-[#6aa58e] uppercase">Postest</p>
-                <p className="text-3xl font-bold">{overview?.posttestCount ?? 0}</p>
-                <p className="text-xs text-gray-500 mt-1">{overview?.posttestRate ?? 0}%</p>
-              </div>
-            </div>
-
-            {/* Group Distribution */}
-            {analytics?.groups && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                  <h2 className="text-lg font-semibold mb-4">Distribución por grupo</h2>
-                  <div className="flex items-center gap-4">
-                    {Object.entries(analytics.groups).map(([group, count]) => (
-                      <div key={group} className="flex-1">
-                        <div
-                          className={`rounded-xl p-4 text-center ${
-                            group === 'GE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'
-                          }`}
-                        >
-                          <p className="text-2xl font-bold">{count}</p>
-                          <p className="text-sm">{group === 'GE' ? 'Experimental' : 'Control'}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-                  <h2 className="text-lg font-semibold mb-4">Promedios de evaluación</h2>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Pretest</span>
-                        <span>{analytics.scores.pretestAverage.toFixed(1)}</span>
-                      </div>
-                      <div className="h-2 bg-[#29382f] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500 rounded-full"
-                          style={{ width: `${Math.min((analytics.scores.pretestAverage / 20) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Postest</span>
-                        <span>{analytics.scores.posttestAverage.toFixed(1)}</span>
-                      </div>
-                      <div className="h-2 bg-[#29382f] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${Math.min((analytics.scores.posttestAverage / 20) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Group Performance Table */}
-            {groupPerformance.length > 0 && (
-              <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 mb-8">
-                <h2 className="text-lg font-semibold mb-4">Rendimiento por grupo</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#29382f]">
-                        <th className="text-left py-2 px-4">Grupo</th>
-                        <th className="text-left py-2 px-4">N</th>
-                        <th className="text-left py-2 px-4">Pretest</th>
-                        <th className="text-left py-2 px-4">Postest</th>
-                        <th className="text-left py-2 px-4">Delta</th>
-                        <th className="text-left py-2 px-4">TAM Utilidad</th>
-                        <th className="text-left py-2 px-4">TAM Facilidad</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupPerformance.map((g, i) => (
-                        <tr key={i} className="border-b border-[#29382f]/50">
-                          <td className="py-2 px-4 font-medium">{String(g.group)}</td>
-                          <td className="py-2 px-4">{String(g.participants)}</td>
-                          <td className="py-2 px-4">{g.pretestAverage !== null ? String(g.pretestAverage) : '-'}</td>
-                          <td className="py-2 px-4">{g.posttestAverage !== null ? String(g.posttestAverage) : '-'}</td>
-                          <td className={`py-2 px-4 ${Number(g.delta) > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {g.delta !== null ? String(g.delta) : '-'}
-                          </td>
-                          <td className="py-2 px-4">{g.tamUtilidad !== null ? String(g.tamUtilidad) : '-'}</td>
-                          <td className="py-2 px-4">{g.tamFacilidad !== null ? String(g.tamFacilidad) : '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
+      <main style={{ padding: 22, height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+        {error && (
+          <div style={{ marginBottom: 16, fontSize: 12, color: TM.red }}>
+            <span style={{ color: TM.dim }}>err →</span> {error}
+          </div>
         )}
 
-        {activeTab === 'participants' && (
-          <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-            <h2 className="text-lg font-semibold mb-4">Progreso de participantes</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#29382f]">
-                    <th className="text-left py-2 px-3">ID</th>
-                    <th className="text-left py-2 px-3">Nombre</th>
-                    <th className="text-left py-2 px-3">Grupo</th>
-                    <th className="text-left py-2 px-3">Progreso</th>
-                    <th className="text-left py-2 px-3">Ejercicios</th>
-                    <th className="text-left py-2 px-3">Registro</th>
+        {/* KPIs 4 columnas */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 18 }}>
+          <TMBox title="USERS" accent={TM.amber}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: TM.amber, lineHeight: 1 }}>{totalUsers}</div>
+            <div style={{ fontSize: 11, color: TM.dim, marginTop: 6 }}>
+              {analytics?.groups ? Object.entries(analytics.groups).map(([g, n]) => `${g}: ${n}`).join(' · ') : '─'}
+            </div>
+          </TMBox>
+          <TMBox title="SESSIONS" accent={TM.cyan}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: TM.cyan, lineHeight: 1 }}>{totalSessions}</div>
+            <div style={{ fontSize: 11, color: TM.dim, marginTop: 6 }}>// ejercicios totales</div>
+          </TMBox>
+          <TMBox title="AVG_MASTERY" accent={TM.green}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: TM.green, lineHeight: 1 }}>
+              {avgMastery > 0 ? avgMastery.toFixed(1) : '─'}
+            </div>
+            <div style={{ fontSize: 11, color: TM.dim, marginTop: 6 }}>
+              pre: {analytics?.scores.pretestAverage.toFixed(1) ?? '─'}
+            </div>
+          </TMBox>
+          <TMBox title="DROPOFF" accent={TM.red}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: TM.red, lineHeight: 1 }}>{dropoffPct}%</div>
+            <div style={{ fontSize: 11, color: TM.dim, marginTop: 6 }}>
+              // {totalUsers - completedCount} sin completar
+            </div>
+          </TMBox>
+        </div>
+
+        {/* Grid 2 columnas: sparklines + study health */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12, marginBottom: 18 }}>
+          {/* Sparklines MASTERY */}
+          <TMBox title="MASTERY · GROUP A vs B" accent={TM.amber}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: TM.amber }}>grupo A · tutor ia (GE)</span>
+                  <span style={{ fontSize: 11, color: TM.dim }}>
+                    {ge ? `${Number(ge.pretestAverage).toFixed(1)} → ${Number(ge.posttestAverage).toFixed(1)}` : '─'}
+                  </span>
+                </div>
+                <Sparkline values={geSparkline} color={TM.amber} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: TM.cyan }}>grupo B · control (GC)</span>
+                  <span style={{ fontSize: 11, color: TM.dim }}>
+                    {gc ? `${Number(gc.pretestAverage).toFixed(1)} → ${Number(gc.posttestAverage).toFixed(1)}` : '─'}
+                  </span>
+                </div>
+                <Sparkline values={gcSparkline} color={TM.cyan} />
+              </div>
+              {ge && gc && (
+                <div style={{ fontSize: 11, color: TM.dim, borderTop: `1px dashed ${TM.rule}`, paddingTop: 8 }}>
+                  delta GE: <span style={{ color: Number(ge.delta) >= 0 ? TM.green : TM.red }}>{Number(ge.delta) >= 0 ? '+' : ''}{Number(ge.delta).toFixed(1)}</span>
+                  {' · '}
+                  delta GC: <span style={{ color: Number(gc.delta) >= 0 ? TM.green : TM.red }}>{Number(gc.delta) >= 0 ? '+' : ''}{Number(gc.delta).toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          </TMBox>
+
+          {/* Study Health */}
+          <TMBox title="STUDY HEALTH" accent={TM.cyan}>
+            <HealthBar label="consent" pct={consentPct} color={TM.amber} />
+            <HealthBar label="pretest" pct={pretestPct} color={TM.cyan} />
+            <HealthBar label="active 7d" pct={activePct} color={TM.amber} />
+            <HealthBar label="posttest" pct={posttestPct} color={TM.green} />
+            <HealthBar label="survey" pct={surveyPct} color={TM.cyan} />
+          </TMBox>
+        </div>
+
+        {/* Tabla USERS · LATEST 6 */}
+        <TMBox title="USERS · LATEST 6" accent={TM.amber}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: FONT_MONO }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${TM.rule}` }}>
+                  {['ID', 'GROUP', 'DAYS', 'SESSIONS', 'MASTERY', 'LAST SEEN'].map((col) => (
+                    <th key={col} style={{
+                      textAlign: 'left', padding: '6px 12px',
+                      fontSize: 10, color: TM.dim, letterSpacing: 1.5, fontWeight: 400,
+                    }}>
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {latest6.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '14px 12px', color: TM.dim, fontSize: 12 }}>
+                      // sin datos de participantes
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {participants.map((p) => (
-                    <tr key={p.id} className="border-b border-[#29382f]/50">
-                      <td className="py-2 px-3 font-mono text-xs">{p.code.slice(0, 8)}...</td>
-                      <td className="py-2 px-3">{p.name || p.email}</td>
-                      <td className="py-2 px-3">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                            p.group === 'GE'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : p.group === 'GC'
-                              ? 'bg-blue-500/20 text-blue-400'
-                              : 'bg-gray-500/20 text-gray-400'
-                          }`}
-                        >
-                          {p.group}
+                )}
+                {latest6.map((p) => {
+                  const days = Math.floor((Date.now() - new Date(p.registeredAt).getTime()) / 86400000);
+                  const steps = [p.progress.registered, p.progress.consented, p.progress.pretested, p.progress.completed].filter(Boolean).length;
+                  const masteryPct = Math.round((steps / 4) * 100);
+                  const mColor = masteryColor(masteryPct);
+                  return (
+                    <tr key={p.id} style={{ borderBottom: `1px solid ${TM.rule}` }}>
+                      <td style={{ padding: '8px 12px', color: TM.amber }}>
+                        {p.code.slice(0, 8)}
+                      </td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <span style={{
+                          color: p.group === 'GE' ? TM.amber : TM.cyan,
+                          fontWeight: 700,
+                        }}>
+                          {p.group === 'GE' ? 'A' : p.group === 'GC' ? 'B' : p.group}
                         </span>
                       </td>
-                      <td className="py-2 px-3">
-                        <div className="flex items-center gap-1">
-                          <div className={`w-2 h-2 rounded-full ${getProgressColor(p.progress.registered)}`} title="Registrado" />
-                          <div className={`w-2 h-2 rounded-full ${getProgressColor(p.progress.consented)}`} title="Consentimiento" />
-                          <div className={`w-2 h-2 rounded-full ${getProgressColor(p.progress.pretested)}`} title="Pretest" />
-                          <div className={`w-2 h-2 rounded-full ${getProgressColor(p.progress.completed)}`} title="Postest" />
-                        </div>
+                      <td style={{ padding: '8px 12px', color: TM.fg }}>{days}</td>
+                      <td style={{ padding: '8px 12px', color: TM.fg }}>{p.exerciseCount}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <span style={{ color: mColor, fontWeight: 700 }}>{masteryPct}%</span>
                       </td>
-                      <td className="py-2 px-3">{p.exerciseCount}</td>
-                      <td className="py-2 px-3 text-xs text-gray-400">
-                        {new Date(p.registeredAt).toLocaleDateString('es-ES')}
+                      <td style={{ padding: '8px 12px', color: TM.dim }}>
+                        {new Date(p.registeredAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {activeTab === 'exports' && (
-          <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-            <h2 className="text-lg font-semibold mb-4">Exportar datos</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <button
-                onClick={() => handleExport('users')}
-                className="rounded-xl px-6 py-4 bg-[#1a2a24] border border-[#29382f] hover:border-emerald-500 transition text-left"
+          {/* Exports inline */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px dashed ${TM.rule}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[
+              { type: 'users', label: './export users' },
+              { type: 'assessments', label: './export assessments' },
+              { type: 'activities', label: './export activities' },
+              { type: 'ancova', label: './export ancova' },
+            ].map(({ type, label }) => (
+              <TMBtn
+                key={type}
+                kind={type === 'ancova' ? 'amber' : 'ghost'}
+                size="sm"
+                onClick={() => handleExport(type)}
               >
-                <p className="font-bold">Usuarios</p>
-                <p className="text-xs text-gray-500">Datos demográficos</p>
-              </button>
-              <button
-                onClick={() => handleExport('assessments')}
-                className="rounded-xl px-6 py-4 bg-[#1a2a24] border border-[#29382f] hover:border-emerald-500 transition text-left"
-              >
-                <p className="font-bold">Evaluaciones</p>
-                <p className="text-xs text-gray-500">Pretest y postest</p>
-              </button>
-              <button
-                onClick={() => handleExport('activities')}
-                className="rounded-xl px-6 py-4 bg-[#1a2a24] border border-[#29382f] hover:border-emerald-500 transition text-left"
-              >
-                <p className="font-bold">Actividades</p>
-                <p className="text-xs text-gray-500">Ejercicios y teoría</p>
-              </button>
-              <button
-                onClick={() => handleExport('ancova')}
-                className="rounded-xl px-6 py-4 bg-emerald-500/10 border border-emerald-500/50 hover:bg-emerald-500/20 transition text-left"
-              >
-                <p className="font-bold text-emerald-400">Dataset ANCOVA</p>
-                <p className="text-xs text-gray-500">Para análisis estadístico</p>
-              </button>
-            </div>
+                {label}
+              </TMBtn>
+            ))}
           </div>
-        )}
+        </TMBox>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 

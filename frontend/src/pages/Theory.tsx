@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { generateTheoryModule, recordTheoryProgress, submitTheoryCheckpoint } from '../services/api.ts';
+import { TM, TMFrame, TMNav, TMBox, TMBtn, TMPrompt } from '../components/terminal';
+import { BlockMath, InlineMath } from 'react-katex';
 
 const Theory = () => {
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ const Theory = () => {
         setActiveModule(data.module);
       }
     } catch {
-      setError('No pudimos generar el módulo.');
+      setError('no pudimos generar el módulo. intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -48,25 +50,59 @@ const Theory = () => {
       await submitTheoryCheckpoint({ moduleId, answers });
       await refreshStudyStatus();
     } catch {
-      setError('Error al validar el checkpoint.');
+      setError('error al validar el checkpoint.');
     }
   };
 
   void handleCheckpoint;
 
-  return (
-    <div className="min-h-screen bg-[#0b1210] text-white">
-      <nav className="flex items-center justify-between border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold">Teoría</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="text-sm hover:text-emerald-400">Dashboard</button>
-          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300">Salir</button>
-        </div>
-      </nav>
-      <main className="px-6 md:px-10 py-10 max-w-3xl mx-auto">
-        {error && <p className="text-red-400 mb-4">{error}</p>}
+  const handleNav = (id: string) => {
+    if (id === 'dash') navigate('/dashboard');
+    else if (id === 'theory') navigate('/theory');
+    else if (id === 'practice') navigate('/exercises');
+    else if (id === 'chatbot') navigate('/chatbot');
+    else if (id === 'profile') navigate('/profile');
+  };
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+  const content = activeModule?.content as string | undefined;
+  const description = activeModule?.description as string | undefined;
+  const glossary = activeModule?.glossary as Array<{ term: string; definition: string }> | undefined;
+
+  const renderContent = (text: string) => {
+    const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$]+?\$)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('$$') && part.endsWith('$$')) {
+        const latex = part.slice(2, -2).trim();
+        return <BlockMath key={i} math={latex} />;
+      }
+      if (part.startsWith('$') && part.endsWith('$')) {
+        const latex = part.slice(1, -1).trim();
+        return <InlineMath key={i} math={latex} />;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  return (
+    <TMFrame title="mathlab" subtitle="~/theory">
+      <TMNav active="theory" onNav={handleNav} />
+      <main style={{ padding: 26, height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+        <TMPrompt>./theory --load</TMPrompt>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '14px 0 4px', color: TM.fg }}>
+          <span style={{ color: TM.amber }}>&gt;</span> módulos de teoría
+        </h1>
+        <div style={{ fontSize: 11, color: TM.dim, marginBottom: 24 }}>
+          // seleccioná un módulo para comenzar
+        </div>
+
+        {error && (
+          <div style={{ marginBottom: 16, fontSize: 12, color: TM.red }}>
+            <span style={{ color: TM.dim }}>err →</span> {error}
+          </div>
+        )}
+
+        {/* Módulo selector */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8, marginBottom: 24 }}>
           {Array.from({ length: 6 }).map((_, i) => {
             const isCompleted = i < (studyStatus?.modulesCompleted ?? 0);
             return (
@@ -74,33 +110,81 @@ const Theory = () => {
                 key={i}
                 onClick={() => generateModule(i)}
                 disabled={loading}
-                className={`rounded-xl p-4 text-center transition ${
-                  isCompleted
-                    ? 'bg-emerald-500/10 border border-emerald-500/30'
-                    : 'bg-[#101a17] border border-[#29382f] hover:border-emerald-500'
-                }`}
+                style={{
+                  background: isCompleted ? 'rgba(155,212,84,0.08)' : TM.panel,
+                  border: `1px solid ${isCompleted ? TM.green : TM.rule}`,
+                  borderLeft: `2px solid ${isCompleted ? TM.green : TM.amber}`,
+                  padding: '10px 6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                  fontFamily: 'inherit',
+                  color: TM.fg,
+                  fontSize: 12,
+                }}
               >
-                <p className="text-sm font-medium">Módulo {i + 1}</p>
-                {isCompleted && <p className="text-xs text-emerald-400 mt-1">Completado</p>}
+                <div style={{ fontWeight: 700, marginBottom: 2 }}>M{i + 1}</div>
+                {isCompleted && <div style={{ fontSize: 10, color: TM.green }}>[x]</div>}
+                {!isCompleted && <div style={{ fontSize: 10, color: TM.dim }}>[ ]</div>}
               </button>
             );
           })}
         </div>
 
-        {activeModule && (
-          <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 md:p-8">
-            <h2 className="text-xl font-bold mb-4">{String((activeModule as { title?: string }).title ?? 'Módulo')}</h2>
-            <p className="text-[#9eb7a8] mb-6">{String((activeModule as { description?: string }).description ?? '')}</p>
-            <button
-              onClick={() => handleProgress((activeModule as { module_id: number }).module_id, 1)}
-              className="rounded-full px-6 py-2 bg-emerald-500 text-black font-bold hover:opacity-90 transition"
-            >
-              Marcar como completado
-            </button>
+        {/* Módulo activo */}
+        {loading && (
+          <div style={{ fontSize: 12, color: TM.dim }}>$ generando módulo…</div>
+        )}
+
+        {activeModule && !loading && (
+          <div style={{ display: 'grid', gridTemplateColumns: glossary?.length ? '1fr 240px' : '1fr', gap: 16, alignItems: 'start' }}>
+            <div>
+              <TMBox title={String(activeModule.title ?? 'MÓDULO')} accent={TM.amber}>
+                {description && (
+                  <p style={{ fontSize: 12, color: TM.dim, marginBottom: 14 }}>// {description}</p>
+                )}
+                <div style={{ fontSize: 14, color: TM.fg, lineHeight: 1.7 }}>
+                  {content ? renderContent(content) : (
+                    <span style={{ color: TM.dim }}>sin contenido disponible.</span>
+                  )}
+                </div>
+                <div style={{ marginTop: 20 }}>
+                  <TMBtn
+                    kind="amber"
+                    onClick={() => handleProgress((activeModule as { module_id: number }).module_id, 1)}
+                  >
+                    ./marcar --completado
+                  </TMBtn>
+                </div>
+              </TMBox>
+            </div>
+
+            {glossary && glossary.length > 0 && (
+              <TMBox title="GLOSARIO" accent={TM.cyan}>
+                {glossary.map((item, i) => (
+                  <div key={i} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: TM.cyan }}>
+                      <span style={{ color: TM.green }}>[x]</span> {item.term}
+                    </div>
+                    <div style={{ fontSize: 11, color: TM.dim, marginTop: 2, paddingLeft: 16 }}>
+                      {item.definition}
+                    </div>
+                  </div>
+                ))}
+              </TMBox>
+            )}
           </div>
         )}
+
+        <div style={{ marginTop: 26, textAlign: 'right' }}>
+          <span
+            onClick={logout}
+            style={{ fontSize: 11, color: TM.dim, cursor: 'pointer' }}
+          >
+            // ./logout
+          </span>
+        </div>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 

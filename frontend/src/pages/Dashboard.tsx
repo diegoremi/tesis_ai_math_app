@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { getActivities, getAssessments } from '../services/api.ts';
+import { TM, TMFrame, TMNav, TMBox, TMPrompt } from '../components/terminal';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -22,35 +23,39 @@ const Dashboard = () => {
         setAssessments(assessmentsResponse.data as Array<Record<string, unknown>>);
         await refreshStudyStatus();
       } catch {
-        setError('No pudimos cargar tu información. Inicia sesión nuevamente.');
+        setError('no pudimos cargar tu información. iniciá sesión de nuevo.');
         logout();
         navigate('/');
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [logout, navigate, refreshStudyStatus]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0b1210]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Cargando panel...</p>
+      <TMFrame title="mathlab" subtitle="~/dashboard">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)' }}>
+          <span style={{ fontSize: 12, color: TM.dim }}>$ cargando…</span>
         </div>
-      </div>
+      </TMFrame>
     );
   }
 
   if (error) {
-    return <div className="text-center text-red-400 mt-10">{error}</div>;
+    return (
+      <TMFrame title="mathlab" subtitle="~/dashboard">
+        <div style={{ padding: 26, fontSize: 13, color: TM.red }}>
+          <span style={{ color: TM.dim }}>err →</span> {error}
+        </div>
+      </TMFrame>
+    );
   }
 
   const chatbotEnabled = Boolean(featureFlags?.chatbot);
   const adaptativeEnabled = Boolean(featureFlags?.adaptativo);
-  const modeLabel = featureFlags ? (adaptativeEnabled ? 'Tutor IA activo' : 'Práctica estándar') : 'Configuración pendiente';
+  const modeLabel = featureFlags ? (adaptativeEnabled ? 'tutor ia activo' : 'práctica estándar') : 'configuración pendiente';
   const modulesRemaining = Math.max((studyStatus?.requiredModules ?? 0) - (studyStatus?.modulesCompleted ?? 0), 0);
   const checkpointsRemaining = Math.max(
     (studyStatus?.requiredCheckpoints ?? 0) - (studyStatus?.checkpointsPassed ?? 0),
@@ -74,92 +79,156 @@ const Dashboard = () => {
     ? ((latestPost as { total_score: number }).total_score ?? 0) - ((latestPre as { total_score: number }).total_score ?? 0)
     : null;
 
+  const handleNav = (id: string) => {
+    if (id === 'dash') navigate('/dashboard');
+    else if (id === 'theory') navigate('/theory');
+    else if (id === 'practice') navigate('/exercises');
+    else if (id === 'chatbot') navigate('/chatbot');
+    else if (id === 'profile') navigate('/profile');
+  };
+
   return (
-    <div className="relative flex min-h-screen flex-col bg-[#0b1210] text-white">
-      <nav className="flex items-center justify-between border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold">AI Math App</span>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-[#6aa58e]">{modeLabel}</span>
-          <Link to="/profile" className="text-sm text-white hover:text-emerald-400">Perfil</Link>
-          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300">Salir</button>
+    <TMFrame title="mathlab" subtitle="~/dashboard">
+      <TMNav active="dash" onNav={handleNav} />
+      <main style={{ padding: 26, height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+        <TMPrompt>./dashboard --status</TMPrompt>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '14px 0 4px', color: TM.fg }}>
+          <span style={{ color: TM.amber }}>&gt;</span> panel de aprendizaje
+        </h1>
+        <div style={{ fontSize: 11, color: TM.dim, marginBottom: 24 }}>
+          // modo: {modeLabel}
         </div>
-      </nav>
-      <main className="flex-1 px-6 md:px-10 py-10">
-        <div className="mx-auto max-w-4xl">
-          <h1 className="text-3xl font-bold mb-6">Panel de aprendizaje</h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-              <p className="text-sm text-[#6aa58e] uppercase tracking-wider">Módulos</p>
-              <p className="text-2xl font-bold mt-1">{studyStatus?.modulesCompleted ?? 0} / {studyStatus?.requiredModules ?? 0}</p>
-              {modulesRemaining > 0 && <p className="text-xs text-[#9eb7a8] mt-1">Faltan {modulesRemaining}</p>}
+        {/* KPIs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+          <TMBox title="MÓDULOS" accent={TM.amber}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: TM.amber }}>
+              {studyStatus?.modulesCompleted ?? 0}
+              <span style={{ fontSize: 14, color: TM.dim }}> / {studyStatus?.requiredModules ?? 0}</span>
             </div>
-            <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-              <p className="text-sm text-[#6aa58e] uppercase tracking-wider">Checkpoints</p>
-              <p className="text-2xl font-bold mt-1">{studyStatus?.checkpointsPassed ?? 0} / {studyStatus?.requiredCheckpoints ?? 0}</p>
-              {checkpointsRemaining > 0 && <p className="text-xs text-[#9eb7a8] mt-1">Faltan {checkpointsRemaining}</p>}
+            {modulesRemaining > 0 && (
+              <div style={{ fontSize: 11, color: TM.dim, marginTop: 4 }}>// faltan {modulesRemaining}</div>
+            )}
+          </TMBox>
+          <TMBox title="CHECKPOINTS" accent={TM.cyan}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: TM.cyan }}>
+              {studyStatus?.checkpointsPassed ?? 0}
+              <span style={{ fontSize: 14, color: TM.dim }}> / {studyStatus?.requiredCheckpoints ?? 0}</span>
             </div>
-            <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6">
-              <p className="text-sm text-[#6aa58e] uppercase tracking-wider">Minutos en teoría</p>
-              <p className="text-2xl font-bold mt-1">{studyStatus?.minutesInTheory ?? 0}</p>
+            {checkpointsRemaining > 0 && (
+              <div style={{ fontSize: 11, color: TM.dim, marginTop: 4 }}>// faltan {checkpointsRemaining}</div>
+            )}
+          </TMBox>
+          <TMBox title="MIN. EN TEORÍA" accent={TM.amber}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: TM.amber }}>
+              {studyStatus?.minutesInTheory ?? 0}
+              <span style={{ fontSize: 14, color: TM.dim }}> min</span>
             </div>
-          </div>
+          </TMBox>
+        </div>
 
-          {latestPre && (
-            <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">Resultados</h2>
-              <div className="flex gap-6">
-                <div>
-                  <p className="text-sm text-[#9eb7a8]">Pretest</p>
-                  <p className="text-xl font-bold">{(latestPre as { total_score: number }).total_score ?? '-'}</p>
+        {/* Resultados */}
+        {latestPre && (
+          <TMBox title="RESULTADOS" accent={TM.cyan} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 32 }}>
+              <div>
+                <div style={{ fontSize: 10, color: TM.dim, letterSpacing: 1.5 }}>PRETEST</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: TM.fg }}>
+                  {(latestPre as { total_score: number }).total_score ?? '─'}
                 </div>
-                {latestPost && (
-                  <div>
-                    <p className="text-sm text-[#9eb7a8]">Postest</p>
-                    <p className="text-xl font-bold">{(latestPost as { total_score: number }).total_score ?? '-'}</p>
-                  </div>
-                )}
-                {deltaScore !== null && (
-                  <div>
-                    <p className="text-sm text-[#9eb7a8]">Diferencia</p>
-                    <p className={`text-xl font-bold ${deltaScore >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {deltaScore >= 0 ? '+' : ''}{deltaScore}
-                    </p>
-                  </div>
-                )}
               </div>
+              {latestPost && (
+                <div>
+                  <div style={{ fontSize: 10, color: TM.dim, letterSpacing: 1.5 }}>POSTEST</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: TM.fg }}>
+                    {(latestPost as { total_score: number }).total_score ?? '─'}
+                  </div>
+                </div>
+              )}
+              {deltaScore !== null && (
+                <div>
+                  <div style={{ fontSize: 10, color: TM.dim, letterSpacing: 1.5 }}>DELTA</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: deltaScore >= 0 ? TM.green : TM.red }}>
+                    {deltaScore >= 0 ? '+' : ''}{deltaScore}
+                  </div>
+                </div>
+              )}
             </div>
+          </TMBox>
+        )}
+
+        {/* Links */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <TMBox
+            title="TEORÍA"
+            accent={TM.amber}
+            style={{ cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: 13, color: TM.fg, marginBottom: 6 }} onClick={() => navigate('/theory')}>
+              ./theory --modules
+            </div>
+            <div style={{ fontSize: 11, color: TM.dim }}>// estudiá los conceptos clave</div>
+          </TMBox>
+
+          <TMBox
+            title="PRÁCTICA"
+            accent={TM.cyan}
+            style={{ cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: 13, color: TM.fg, marginBottom: 6 }} onClick={() => navigate('/exercises')}>
+              ./practice --adaptive
+            </div>
+            <div style={{ fontSize: 11, color: TM.dim }}>// ejercicios adaptados a tu nivel</div>
+          </TMBox>
+
+          {chatbotEnabled && (
+            <TMBox
+              title="TUTOR IA"
+              accent={TM.amber}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: 13, color: TM.fg, marginBottom: 6 }} onClick={() => navigate('/chatbot')}>
+                ./tutor --chat
+              </div>
+              <div style={{ fontSize: 11, color: TM.dim }}>// preguntá dudas y recibí ayuda paso a paso</div>
+            </TMBox>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link to="/theory" className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 hover:border-emerald-500 transition">
-              <h3 className="text-lg font-semibold">Módulos de teoría</h3>
-              <p className="text-sm text-[#9eb7a8] mt-1">Estudia los conceptos clave antes de practicar.</p>
-            </Link>
-            <Link to="/exercises" className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 hover:border-emerald-500 transition">
-              <h3 className="text-lg font-semibold">Ejercicios</h3>
-              <p className="text-sm text-[#9eb7a8] mt-1">Practica con problemas adaptados a tu nivel.</p>
-            </Link>
-            {chatbotEnabled && (
-              <Link to="/chatbot" className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 hover:border-emerald-500 transition">
-                <h3 className="text-lg font-semibold">Tutor IA</h3>
-                <p className="text-sm text-[#9eb7a8] mt-1">Pregunta dudas y recibe explicaciones paso a paso.</p>
-              </Link>
-            )}
-            <Link to="/survey" className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 hover:border-emerald-500 transition">
-              <h3 className="text-lg font-semibold">Encuestas</h3>
-              <p className="text-sm text-[#9eb7a8] mt-1">Comparte tu experiencia y motivación.</p>
-            </Link>
-            {posttestUnlocked && (
-              <Link to="/study/exit-test" className="bg-emerald-500/10 border border-emerald-500 rounded-2xl p-6 hover:bg-emerald-500/20 transition">
-                <h3 className="text-lg font-semibold text-emerald-400">Realizar postest</h3>
-                <p className="text-sm text-emerald-300 mt-1">Has completado los requisitos. Evalúa tu progreso.</p>
-              </Link>
-            )}
-          </div>
+          <TMBox
+            title="ENCUESTA"
+            accent={TM.cyan}
+            style={{ cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: 13, color: TM.fg, marginBottom: 6 }} onClick={() => navigate('/survey')}>
+              ./survey --run
+            </div>
+            <div style={{ fontSize: 11, color: TM.dim }}>// compartí tu experiencia</div>
+          </TMBox>
+
+          {posttestUnlocked && (
+            <TMBox
+              title="POSTEST DISPONIBLE"
+              accent={TM.green}
+              style={{ cursor: 'pointer', gridColumn: '1 / -1' }}
+            >
+              <div style={{ fontSize: 13, color: TM.green, marginBottom: 6 }} onClick={() => navigate('/study/exit-test')}>
+                <span style={{ color: TM.green }}>[x]</span> ./posttest --start
+              </div>
+              <div style={{ fontSize: 11, color: TM.dim }}>// completaste los requisitos — evaluá tu progreso</div>
+            </TMBox>
+          )}
+        </div>
+
+        <div style={{ marginTop: 26, textAlign: 'right' }}>
+          <span
+            onClick={logout}
+            style={{ fontSize: 11, color: TM.dim, cursor: 'pointer' }}
+          >
+            // ./logout
+          </span>
         </div>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createAssessment, getAssessmentItems } from '../services/api.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { TM, TMFrame, TMBtn, TMBox, FONT_MONO } from '../components/terminal';
 
 const SUPERSCRIPT_MAP: Record<string, string> = {
   '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
@@ -26,6 +27,7 @@ const ExitTest = () => {
   const { refreshAssessmentStatus } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [flagged, setFlagged] = useState<Record<number, boolean>>({});
   const [items, setItems] = useState<AssessmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -42,9 +44,10 @@ const ExitTest = () => {
         const fetched = (response.data as { items?: AssessmentItem[] }).items ?? [];
         setItems(fetched);
         setAnswers({});
+        setFlagged({});
         setStep(0);
       } catch {
-        setError('No pudimos cargar las preguntas del exit test. Intenta nuevamente.');
+        setError('no pudimos cargar las preguntas del exit test. intentá de nuevo.');
       } finally {
         setLoading(false);
       }
@@ -66,27 +69,18 @@ const ExitTest = () => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [loading, submitted]);
+  }, [loading, submitted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Anti-copy
   useEffect(() => {
-    const handleCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      alert('La copia esta deshabilitada durante la evaluacion.');
-    };
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
+    const handleCopy = (e: ClipboardEvent) => { e.preventDefault(); };
+    const handleContextMenu = (e: MouseEvent) => { e.preventDefault(); };
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setTabSwitches((prev) => prev + 1);
-      }
+      if (document.hidden) setTabSwitches((prev) => prev + 1);
     };
-
     document.addEventListener('copy', handleCopy);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('contextmenu', handleContextMenu);
@@ -102,15 +96,11 @@ const ExitTest = () => {
         item_id: item.item_id,
         answer: answers[item.item_id] ?? null,
       }));
-      await createAssessment({
-        assessment_type: 'posttest',
-        test_version: 'exit_v1',
-        responses,
-      });
+      await createAssessment({ assessment_type: 'posttest', test_version: 'exit_v1', responses });
       await refreshAssessmentStatus();
       setSubmitted(true);
     } catch {
-      setError('El tiempo se agoto pero no pudimos guardar tus respuestas.');
+      setError('el tiempo se agotó y no pudimos guardar tus respuestas.');
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +117,7 @@ const ExitTest = () => {
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0');
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const handleInput = (value: string) => {
@@ -135,12 +125,12 @@ const ExitTest = () => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.item_id]: value }));
   };
 
-  const handleNext = () => {
-    if (step < items.length - 1) setStep(step + 1);
-  };
+  const handleNext = () => { if (step < items.length - 1) setStep(step + 1); };
+  const handlePrev = () => { if (step > 0) setStep(step - 1); };
 
-  const handlePrev = () => {
-    if (step > 0) setStep(step - 1);
+  const toggleFlag = () => {
+    if (!currentQuestion) return;
+    setFlagged((prev) => ({ ...prev, [currentQuestion.item_id]: !prev[currentQuestion.item_id] }));
   };
 
   const handleSubmit = async () => {
@@ -151,157 +141,245 @@ const ExitTest = () => {
         item_id: item.item_id,
         answer: answers[item.item_id] ?? null,
       }));
-
-      await createAssessment({
-        assessment_type: 'posttest',
-        test_version: 'exit_v1',
-        responses,
-      });
-
+      await createAssessment({ assessment_type: 'posttest', test_version: 'exit_v1', responses });
       await refreshAssessmentStatus();
       setSubmitted(true);
     } catch {
-      setError('No pudimos guardar tus respuestas. Intenta nuevamente.');
+      setError('no pudimos guardar tus respuestas. intentá de nuevo.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const timeWarning = timeLeft < 300;
+
+  // ─── estados ───────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
-      </div>
+      <TMFrame title="mathlab" subtitle="~/posttest">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)' }}>
+          <span style={{ fontSize: 12, color: TM.dim }}>$ cargando preguntas…</span>
+        </div>
+      </TMFrame>
     );
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
-        <div className="max-w-lg w-full bg-gray-900 rounded-3xl border border-gray-800 p-12 text-center shadow-2xl text-gray-50">
-          <h1 className="text-3xl font-bold tracking-tight">Completaste el exit test!</h1>
-          <p className="mt-4 text-base text-gray-400">
-            Gracias por compartir tu progreso. Libera tus reportes desde el panel y revisa las recomendaciones finales.
-          </p>
-          {tabSwitches > 0 && (
-            <p className="mt-2 text-xs text-yellow-400">
-              Se detectaron {tabSwitches} cambios de pestana durante la evaluacion.
+      <TMFrame title="mathlab" subtitle="~/posttest/done">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)', padding: 36 }}>
+          <div style={{ width: 460, maxWidth: '100%' }}>
+            <div style={{ fontSize: 12, color: TM.dim, marginBottom: 14 }}>$ ./posttest --formal</div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: TM.fg, margin: '0 0 8px' }}>
+              <span style={{ color: TM.green }}>[x]</span> exit test completado
+            </h1>
+            <p style={{ fontSize: 13, color: TM.dim, marginBottom: 22, lineHeight: 1.6 }}>
+              // gracias por compartir tu progreso. revisá los reportes finales desde el panel.
             </p>
-          )}
-          <button
-            type="button"
-            className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-3 text-sm font-semibold text-gray-950 hover:bg-sky-400 transition"
-            onClick={() => navigate('/dashboard', { replace: true })}
-          >
-            Volver al panel
-          </button>
+            {tabSwitches > 0 && (
+              <div style={{ fontSize: 11, color: TM.amber, marginBottom: 16 }}>
+                warn → se detectaron {tabSwitches} cambios de pestaña durante la evaluación.
+              </div>
+            )}
+            <TMBtn kind="amber" onClick={() => navigate('/dashboard', { replace: true })}>
+              ./volver al panel →
+            </TMBtn>
+          </div>
         </div>
-      </div>
+      </TMFrame>
     );
   }
 
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">No hay preguntas disponibles en este momento.</p>
-      </div>
+      <TMFrame title="mathlab" subtitle="~/posttest">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 32px)' }}>
+          <span style={{ fontSize: 12, color: TM.dim }}>// no hay preguntas disponibles en este momento.</span>
+        </div>
+      </TMFrame>
     );
   }
 
+  // ─── pantalla principal ────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-50 select-none" onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}>
-      <header className="flex flex-col gap-4 border-b border-gray-800 px-4 md:px-8 py-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div className="flex flex-col gap-1">
-            <span className="text-lg font-bold">AI Math App</span>
-            <span className="text-xs uppercase tracking-[0.35em] text-gray-400">Evaluacion final - Postest</span>
+    <TMFrame title="mathlab" subtitle="~/posttest">
+      <div
+        style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 32px)' }}
+        onCopy={(e) => e.preventDefault()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {/* Header sticky */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 26px',
+          background: TM.panel,
+          borderBottom: `1px solid ${TM.rule}`,
+        }}>
+          <div style={{ fontSize: 12, color: TM.amber }}>
+            $ ./posttest --formal
+            <span style={{ color: TM.amber, animation: 'tm-blink 1.1s steps(1) infinite', marginLeft: 4 }}>▌</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className={`text-sm font-mono font-bold px-3 py-1 rounded-full ${timeLeft < 300 ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-300'}`}>
-              {formatTime(timeLeft)}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             {tabSwitches > 0 && (
-              <span className="text-xs text-yellow-400">Cambios de pestana: {tabSwitches}</span>
+              <span style={{ fontSize: 11, color: TM.amber }}>
+                warn → {tabSwitches} cambios de pestaña
+              </span>
             )}
+            <span style={{
+              fontSize: 13, fontWeight: 700, fontFamily: FONT_MONO,
+              color: timeWarning ? TM.red : TM.cyan,
+              padding: '2px 10px',
+              border: `1px solid ${timeWarning ? TM.red : TM.cyan}`,
+            }}>
+              {formatTime(timeLeft)}
+            </span>
           </div>
         </div>
-      </header>
 
-      <main className="px-4 md:px-6 py-8 md:py-12 flex justify-center">
-        <div className="w-full max-w-2xl bg-gray-900/60 rounded-2xl border border-gray-800 shadow-2xl p-6 md:p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Pregunta {step + 1} de {items.length}</h2>
-            <p className="text-sm text-gray-400">Demuestra cuanto avanzaste. Confia en tu proceso.</p>
+        {/* Body: 2 columnas */}
+        <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+          {/* Columna principal */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '26px 26px 0' }}>
+            {/* Numeración y progreso */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>
+                <span style={{ color: TM.amber }}>Q{step + 1}</span>
+                <span style={{ color: TM.dim }}> / {items.length}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 120, height: 4, background: TM.rule }}>
+                  <div style={{ width: `${progress}%`, height: '100%', background: TM.amber }} />
+                </div>
+                <span style={{ fontSize: 11, color: TM.dim }}>{progress}%</span>
+              </div>
+            </div>
+
+            {/* Enunciado */}
+            <div style={{
+              fontSize: 16, color: TM.fg, lineHeight: 1.65,
+              marginBottom: 22, padding: '14px 18px',
+              background: TM.panel, border: `1px solid ${TM.rule}`,
+              borderLeft: `2px solid ${TM.amber}`, borderLeftWidth: 2,
+            }}>
+              {toSuperscript(currentQuestion.stem)}
+            </div>
+
+            {/* Opciones */}
+            <div style={{ display: 'grid', gap: 8, marginBottom: 22 }}>
+              {optionList.map((option) => {
+                const selected = answers[currentQuestion.item_id] === (option.key ?? option.label);
+                return (
+                  <button
+                    key={option.key ?? option.label}
+                    type="button"
+                    onClick={() => handleInput(option.key ?? option.label)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px',
+                      background: selected ? 'rgba(255,180,84,0.08)' : TM.panel,
+                      border: `1px solid ${selected ? TM.amber : TM.rule}`,
+                      borderLeft: `2px solid ${selected ? TM.amber : TM.rule}`,
+                      cursor: 'pointer', fontFamily: FONT_MONO,
+                      color: TM.fg, fontSize: 14, textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ color: selected ? TM.amber : TM.dim, fontWeight: 700, flexShrink: 0 }}>
+                      {selected ? '[x]' : '[ ]'}
+                    </span>
+                    <span style={{ color: TM.amber, fontWeight: 700, flexShrink: 0 }}>{option.key}.</span>
+                    {toSuperscript(option.label)}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Marcar para revisar */}
+            <div style={{ marginBottom: 16 }}>
+              <TMBtn
+                kind="ghost"
+                size="sm"
+                onClick={toggleFlag}
+                style={{ borderColor: flagged[currentQuestion.item_id] ? TM.amber : TM.rule }}
+              >
+                {flagged[currentQuestion.item_id] ? '▓ marcada para revisar' : '░ marcar para revisar'}
+              </TMBtn>
+            </div>
+
+            {error && (
+              <div style={{ marginBottom: 16, fontSize: 12, color: TM.red }}>
+                <span style={{ color: TM.dim }}>err →</span> {error}
+              </div>
+            )}
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300 font-medium">Progreso</span>
-              <span className="text-sky-400 font-semibold">{progress}%</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-gray-700 overflow-hidden">
-              <div className="h-full bg-sky-500" style={{ width: `${progress}%` }}></div>
-            </div>
+          {/* Sidebar: hoja de respuestas */}
+          <div style={{
+            width: 200, flexShrink: 0, borderLeft: `1px solid ${TM.rule}`,
+            overflowY: 'auto', padding: 14,
+          }}>
+            <TMBox title="RESPUESTAS" accent={TM.cyan} style={{ border: 'none', padding: 0, background: 'transparent' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {items.map((item, i) => {
+                  const answered = Boolean(answers[item.item_id]);
+                  const isFlagged = Boolean(flagged[item.item_id]);
+                  const isCurrent = i === step;
+                  let glyph = '░';
+                  if (isFlagged) glyph = '▓';
+                  else if (answered) glyph = '▒';
+
+                  return (
+                    <button
+                      key={item.item_id}
+                      onClick={() => setStep(i)}
+                      title={`Q${i + 1}`}
+                      style={{
+                        width: 28, height: 28,
+                        background: isCurrent ? 'rgba(255,180,84,0.15)' : TM.panel,
+                        border: `1px solid ${isCurrent ? TM.amber : TM.rule}`,
+                        cursor: 'pointer', fontFamily: FONT_MONO, fontSize: 13,
+                        color: isFlagged ? TM.amber : answered ? TM.cyan : TM.dim,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {glyph}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: 14, fontSize: 10, color: TM.dim, lineHeight: 1.8 }}>
+                <div><span style={{ color: TM.dim }}>░</span> sin responder</div>
+                <div><span style={{ color: TM.cyan }}>▒</span> contestada</div>
+                <div><span style={{ color: TM.amber }}>▓</span> revisar</div>
+              </div>
+            </TMBox>
           </div>
+        </div>
 
-          <section className="space-y-5">
-            <h3 className="text-lg font-semibold">{toSuperscript(currentQuestion.stem)}</h3>
-            <div className="grid gap-3">
-              {optionList.map((option) => (
-                <button
-                  key={option.key ?? option.label}
-                  type="button"
-                  onClick={() => handleInput(option.key ?? option.label)}
-                  className={`text-left rounded-xl border px-4 py-3 transition ${
-                    answers[currentQuestion.item_id] === (option.key ?? option.label)
-                      ? 'border-sky-400 bg-sky-500/10 text-white'
-                      : 'border-gray-700 bg-gray-900 hover:border-sky-500/60'
-                  }`}
-                >
-                  {toSuperscript(option.label ?? option)}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {error && (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {error}
-            </div>
+        {/* Footer */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '14px 26px',
+          borderTop: `1px solid ${TM.rule}`,
+          background: TM.bg,
+        }}>
+          <TMBtn kind="ghost" onClick={handlePrev} disabled={step === 0 || submitting}>
+            ./back
+          </TMBtn>
+          {step < items.length - 1 ? (
+            <TMBtn kind="amber" onClick={handleNext} disabled={submitting}>
+              ./next →
+            </TMBtn>
+          ) : (
+            <TMBtn kind="amber" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? './enviando…' : './submit --posttest →'}
+            </TMBtn>
           )}
-
-          <footer className="flex flex-col sm:flex-row gap-3 justify-between">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={step === 0 || submitting}
-              className="flex items-center justify-center gap-2 rounded-full border border-gray-700 px-6 py-2 text-sm font-semibold text-gray-200 disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            {step < items.length - 1 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-sky-400 transition disabled:opacity-70"
-              >
-                Siguiente
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 rounded-full bg-sky-500 px-6 py-2 text-sm font-semibold text-gray-950 hover:bg-sky-400 transition disabled:opacity-70"
-              >
-                {submitting ? 'Enviando...' : 'Finalizar exit test'}
-              </button>
-            )}
-          </footer>
         </div>
-      </main>
-    </div>
+      </div>
+    </TMFrame>
   );
 };
 

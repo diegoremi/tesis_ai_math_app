@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { getExercise, submitAnswer, getHint } from '../services/api.ts';
+import { TM, TMFrame, TMNav, TMBox, TMBtn, TMPrompt } from '../components/terminal';
 
 const Exercises = () => {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ const Exercises = () => {
       const res = await getExercise();
       setExercise(res.data as Record<string, unknown>);
     } catch {
-      setError('No pudimos cargar el ejercicio.');
+      setError('no pudimos cargar el ejercicio.');
     } finally {
       setLoading(false);
     }
@@ -48,7 +49,7 @@ const Exercises = () => {
       });
       setResult(res.data as Record<string, unknown>);
     } catch {
-      setError('Error al enviar la respuesta.');
+      setError('error al enviar la respuesta.');
     } finally {
       setSubmitting(false);
     }
@@ -58,82 +59,193 @@ const Exercises = () => {
     if (!exercise) return;
     try {
       const res = await getHint(exercise.id as number, hintLevel);
-      setHint((res.data as { hint?: string }).hint ?? 'Aqui tienes una pista...');
+      setHint((res.data as { hint?: string }).hint ?? 'aquí va una pista…');
       setHintLevel((prev) => Math.min(prev + 1, 3));
     } catch {
-      setError('No pudimos obtener la pista.');
+      setError('no pudimos obtener la pista.');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0b1210]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
+  const handleNav = (id: string) => {
+    if (id === 'dash') navigate('/dashboard');
+    else if (id === 'theory') navigate('/theory');
+    else if (id === 'practice') navigate('/exercises');
+    else if (id === 'chatbot') navigate('/chatbot');
+    else if (id === 'profile') navigate('/profile');
+  };
+
+  const options = (exercise?.options as Array<{ key: string; label: string }>) ?? [];
+  const correct = result?.correct as boolean | undefined;
+  const explanation = result?.explanation as string | undefined;
+  const steps = result?.steps as Array<string> | undefined;
 
   return (
-    <div className="min-h-screen bg-[#0b1210] text-white">
-      <nav className="flex items-center justify-between border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold">Ejercicios</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="text-sm hover:text-emerald-400">Dashboard</button>
-          <button onClick={logout} className="text-sm text-red-400 hover:text-red-300">Salir</button>
+    <TMFrame title="mathlab" subtitle="~/practice">
+      <TMNav active="practice" onNav={handleNav} />
+      <main style={{ padding: 26, height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+        <TMPrompt>./practice --adaptive</TMPrompt>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '14px 0 4px', color: TM.fg }}>
+          <span style={{ color: TM.amber }}>&gt;</span> ejercicios
+        </h1>
+        <div style={{ fontSize: 11, color: TM.dim, marginBottom: 24 }}>
+          // resolvé el ejercicio y enviá tu respuesta
         </div>
-      </nav>
-      <main className="px-6 md:px-10 py-10 max-w-2xl mx-auto">
-        {error && <p className="text-red-400 mb-4">{error}</p>}
-        {exercise && (
-          <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 md:p-8">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs uppercase tracking-wider text-[#6aa58e]">{String(exercise.domain ?? '')} · {String(exercise.competency ?? '')}</span>
-              {chatbotEnabled && (
-                <button onClick={handleHint} className="text-sm text-emerald-400 hover:text-emerald-300">Pedir pista</button>
-              )}
-            </div>
-            <p className="text-lg font-medium mb-6">{String(exercise.stem ?? '')}</p>
-            <div className="space-y-3 mb-6">
-              {((exercise.options as Array<{ key: string; label: string }>) ?? []).map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => setAnswer(option.key)}
-                  className={`w-full text-left rounded-xl border px-4 py-3 transition ${
-                    answer === option.key
-                      ? 'border-emerald-500 bg-emerald-500/10'
-                      : 'border-[#29382f] hover:border-[#6aa58e]'
-                  }`}
-                >
-                  <span className="font-bold mr-2">{option.key}.</span>
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={handleSubmit}
-              disabled={!answer || submitting}
-              className="w-full rounded-full h-12 bg-emerald-500 text-black font-bold hover:opacity-90 transition disabled:opacity-60"
+
+        {error && (
+          <div style={{ marginBottom: 16, fontSize: 12, color: TM.red }}>
+            <span style={{ color: TM.dim }}>err →</span> {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ fontSize: 12, color: TM.dim }}>$ cargando ejercicio…</div>
+        )}
+
+        {!loading && exercise && (
+          <div style={{ maxWidth: 640 }}>
+            {/* Enunciado */}
+            <TMBox
+              title={`${String(exercise.domain ?? '')} · ${String(exercise.competency ?? '')}`}
+              accent={TM.amber}
+              style={{ marginBottom: 14 }}
             >
-              {submitting ? 'Enviando...' : 'Enviar respuesta'}
-            </button>
-            {hint && (
-              <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                <p className="text-sm text-blue-300">{hint}</p>
+              <p style={{ fontSize: 15, color: TM.fg, lineHeight: 1.6, margin: 0 }}>
+                {String(exercise.stem ?? '')}
+              </p>
+            </TMBox>
+
+            {/* Opciones múltiple choice */}
+            {options.length > 0 && !result && (
+              <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+                {options.map((option) => {
+                  const selected = answer === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => setAnswer(option.key)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '10px 14px',
+                        background: selected ? 'rgba(255,180,84,0.08)' : TM.panel,
+                        border: `1px solid ${selected ? TM.amber : TM.rule}`,
+                        borderLeft: `2px solid ${selected ? TM.amber : TM.rule}`,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        color: TM.fg,
+                        fontSize: 13,
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ color: selected ? TM.amber : TM.dim, fontWeight: 700 }}>
+                        {selected ? '[x]' : '[ ]'}
+                      </span>
+                      <span style={{ color: TM.amber, fontWeight: 700 }}>{option.key}.</span>
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
-            {result && (
-              <div className={`mt-4 p-4 rounded-xl ${(result.correct as boolean) ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                <p className={`font-bold ${(result.correct as boolean) ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {(result.correct as boolean) ? 'Correcto!' : 'Incorrecto'}
-                </p>
-                <p className="text-sm text-[#9eb7a8] mt-1">{String((result as { explanation?: string }).explanation ?? '')}</p>
-                <button onClick={fetchExercise} className="mt-3 text-sm text-emerald-400 hover:text-emerald-300">Siguiente ejercicio</button>
+
+            {/* Input libre (si no hay opciones) */}
+            {options.length === 0 && !result && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block' }}>
+                  <span style={{ fontSize: 10, color: TM.amber, letterSpacing: 1.5 }}>&gt; respuesta</span>
+                  <input
+                    type="text"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="escribí tu respuesta…"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      background: TM.panel,
+                      color: TM.fg,
+                      border: `1px solid ${TM.rule}`,
+                      borderLeft: `2px solid ${TM.amber}`,
+                      padding: '8px 12px',
+                      marginTop: 4,
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      borderRadius: 0,
+                    }}
+                  />
+                </label>
               </div>
+            )}
+
+            {/* Acciones */}
+            {!result && (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                <TMBtn kind="amber" onClick={handleSubmit} disabled={!answer || submitting}>
+                  {submitting ? './enviando…' : './solve'}
+                </TMBtn>
+                {chatbotEnabled && (
+                  <TMBtn kind="ghost" onClick={handleHint}>./hint</TMBtn>
+                )}
+              </div>
+            )}
+
+            {/* Pista */}
+            {hint && (
+              <TMBox title="PISTA" accent={TM.cyan} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, color: TM.fg }}>
+                  <span style={{ color: TM.cyan }}>↳</span> {hint}
+                </div>
+              </TMBox>
+            )}
+
+            {/* Verificación */}
+            {result && (
+              <>
+                <TMBox
+                  title="VERIFICACIÓN"
+                  accent={correct ? TM.green : TM.red}
+                  style={{ marginBottom: 14 }}
+                >
+                  <div style={{ fontSize: 14, color: correct ? TM.green : TM.red, fontWeight: 700, marginBottom: 8 }}>
+                    {correct
+                      ? <><span>[x]</span> respuesta correcta</>
+                      : <><span>[ ]</span> respuesta incorrecta</>
+                    }
+                  </div>
+                  {explanation && (
+                    <div style={{ fontSize: 13, color: TM.fg }}>{explanation}</div>
+                  )}
+                </TMBox>
+
+                {/* Tutor IA */}
+                {steps && steps.length > 0 && (
+                  <TMBox title="TUTOR.AI" accent={TM.amber} style={{ marginBottom: 14 }}>
+                    {steps.map((step, i) => (
+                      <div key={i} style={{ fontSize: 13, color: TM.fg, marginBottom: 6 }}>
+                        <span style={{ color: TM.cyan }}>↳</span> {step}
+                      </div>
+                    ))}
+                  </TMBox>
+                )}
+
+                <TMBtn kind="ghost" onClick={fetchExercise}>./siguiente --ejercicio</TMBtn>
+              </>
             )}
           </div>
         )}
+
+        <div style={{ marginTop: 26, textAlign: 'right' }}>
+          <span
+            onClick={logout}
+            style={{ fontSize: 11, color: TM.dim, cursor: 'pointer' }}
+          >
+            // ./logout
+          </span>
+        </div>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 

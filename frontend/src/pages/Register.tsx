@@ -2,8 +2,31 @@ import { useState, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { registerUser } from '../services/api.ts';
+import { TM, TMFrame, TMField, TMBtn, TMPrompt, TMBox } from '../components/terminal';
 
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+const inputStyle = {
+  display: 'block',
+  width: '100%',
+  boxSizing: 'border-box' as const,
+  background: TM.panel,
+  color: TM.fg,
+  border: `1px solid ${TM.rule}`,
+  borderLeft: `2px solid ${TM.amber}`,
+  padding: '8px 12px',
+  marginTop: 4,
+  fontSize: 14,
+  fontFamily: 'inherit',
+  outline: 'none',
+  borderRadius: 0,
+};
+
+const labelStyle = {
+  fontSize: 10,
+  color: TM.amber,
+  letterSpacing: 1.5,
+} as const;
 
 const Register = () => {
   const navigate = useNavigate();
@@ -34,7 +57,7 @@ const Register = () => {
 
     const recaptchaToken = recaptchaRef.current?.getValue?.();
     if (recaptchaSiteKey && !recaptchaToken) {
-      setError('Completa el reCAPTCHA antes de continuar.');
+      setError('completá el reCAPTCHA antes de continuar.');
       setLoading(false);
       return;
     }
@@ -60,112 +83,169 @@ const Register = () => {
       setShowSuccessModal(true);
     } catch {
       recaptchaRef.current?.reset();
-      setError('No pudimos crear tu cuenta. Revisa los datos e inténtalo nuevamente.');
+      setError('no pudimos crear tu cuenta. revisá los datos e intentá de nuevo.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative flex size-full min-h-screen flex-col bg-[#111714] overflow-x-hidden">
-      <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#29382f] px-10 py-3">
-        <span className="text-lg font-bold tracking-tight text-white">AI Math App</span>
-        <button
-          className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-6 bg-white/10 text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-white/20 transition-colors"
-          onClick={() => navigate('/')}
-          type="button"
-        >
-          <span className="truncate">Iniciar sesión</span>
-        </button>
-      </header>
-      <main className="flex flex-1 justify-center py-5">
-        <div className="layout-content-container flex flex-col w-[512px] max-w-[512px] py-10 px-8">
-          <h1 className="text-white tracking-tighter text-4xl font-bold leading-tight text-center pb-8">Crea tu cuenta</h1>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <label className="flex flex-col gap-2">
-              <p className="text-white text-base font-medium leading-normal">Nombre completo</p>
-              <input className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white" placeholder="Ej. Ana Pérez" name="full_name" value={formData.full_name} onChange={handleChange} required />
-            </label>
-            <label className="flex flex-col gap-2">
-              <p className="text-white text-base font-medium leading-normal">Correo electrónico</p>
-              <input className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white" placeholder="ejemplo@correo.com" type="email" name="email" value={formData.email} onChange={handleChange} required />
-            </label>
-            <label className="flex flex-col gap-2">
-              <p className="text-white text-base font-medium leading-normal">Contraseña</p>
-              <input className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white" placeholder="Crea una contraseña segura" type="password" name="password" value={formData.password} onChange={handleChange} required />
-            </label>
-            <div className="grid grid-cols-2 gap-4">
-              <label className="flex flex-col gap-2">
-                <p className="text-white text-base font-medium leading-normal">Edad</p>
-                <input className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white" placeholder="Ingresa tu edad" type="number" name="age" value={formData.age} onChange={handleChange} required />
-              </label>
-              <label className="flex flex-col gap-2">
-                <p className="text-white text-base font-medium leading-normal">Nivel educativo</p>
-                <select className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white" name="education_level" value={formData.education_level} onChange={handleChange}>
-                  <option value="high_school">Secundario</option>
-                  <option value="university">Universitario</option>
-                  <option value="other">Otro</option>
-                </select>
+    <TMFrame title="mathlab" subtitle="~/auth/register">
+      <main
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 32px)',
+          padding: '36px 20px',
+        }}
+      >
+        <form onSubmit={handleSubmit} style={{ width: 460, maxWidth: '100%' }}>
+          <TMPrompt color={TM.cyan}>./register --new</TMPrompt>
+          <h1 style={{ fontSize: 26, color: TM.fg, fontWeight: 700, margin: '14px 0 6px' }}>
+            <span style={{ color: TM.amber }}>&gt;</span> crear cuenta
+          </h1>
+          <div style={{ fontSize: 11, color: TM.dim, marginBottom: 22 }}>
+            // completá tus datos para unirte al estudio
+          </div>
+
+          <div style={{ display: 'grid', gap: 14 }}>
+            <TMField label="nombre completo" placeholder="Ana Pérez"
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} required />
+
+            <TMField label="email" placeholder="ana@correo.com" type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+
+            <TMField label="contraseña" placeholder="mínimo 8 caracteres" type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <TMField label="edad" placeholder="22" type="number"
+                value={formData.age}
+                onChange={(e) => setFormData({ ...formData, age: e.target.value })} required />
+
+              <label style={{ display: 'block' }}>
+                <span style={labelStyle}>&gt; nivel educativo</span>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    name="education_level"
+                    value={formData.education_level}
+                    onChange={handleChange}
+                    style={{
+                      ...inputStyle,
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      paddingRight: 28,
+                      width: '100%',
+                    }}
+                  >
+                    <option value="high_school">secundario</option>
+                    <option value="university">universitario</option>
+                    <option value="other">otro</option>
+                  </select>
+                  <span style={{
+                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                    color: TM.amber, fontSize: 12, pointerEvents: 'none',
+                  }}>▾</span>
+                </div>
               </label>
             </div>
-            <label className="flex flex-col gap-2">
-              <p className="text-white text-base font-medium leading-normal">Objetivos con matemática</p>
-              <textarea className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-[#29382f] text-white min-h-28" placeholder="Ej. Aprobar análisis, fortalecer álgebra" name="math_goals" value={formData.math_goals} onChange={handleChange}></textarea>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="agree_terms"
-                checked={formData.agree_terms}
+
+            <label style={{ display: 'block' }}>
+              <span style={labelStyle}>&gt; objetivos con matemática</span>
+              <textarea
+                name="math_goals"
+                value={formData.math_goals}
                 onChange={handleChange}
-                required
-                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 bg-[#29382f]"
+                placeholder="ej. aprobar análisis, reforzar álgebra"
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical' }}
               />
-              <span className="text-white text-sm">
-                Acepto los términos y condiciones del estudio
-              </span>
             </label>
-            {recaptchaSiteKey ? (
-              <ReCAPTCHA
-                ref={recaptchaRef}
-                sitekey={recaptchaSiteKey}
-              />
-            ) : (
-              <p className="text-red-400 text-sm">
-                Falta configurar la clave de sitio de reCAPTCHA en el entorno.
-              </p>
-            )}
-            <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-12 px-5 mt-4 bg-emerald-500 text-[#111714] text-base font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity" type="submit" disabled={loading}>
-              <span className="truncate">{loading ? 'Creando cuenta...' : 'Crear cuenta'}</span>
-            </button>
-            {error && <p className="text-red-400 text-center mt-2">{error}</p>}
-            <p className="text-[#9eb7a8] text-xs font-normal leading-normal pt-2 px-4 text-center">
-              Sitio protegido por reCAPTCHA. Aplican la <a className="underline hover:text-white" href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Política de Privacidad</a> y los <a className="underline hover:text-white" href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Términos de servicio</a> de Google.
-            </p>
-          </form>
-        </div>
-      </main>
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
-          <div className="w-full max-w-md rounded-3xl border border-[#2a3a33] bg-[#0f1713] p-8 text-center shadow-2xl">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500">
-              <span className="text-3xl">check_circle</span>
-            </div>
-            <h2 className="mt-6 text-2xl font-semibold text-white">Cuenta creada</h2>
-            <p className="mt-3 text-sm text-[#9eb7a8]">
-              Guardamos tus datos de acceso. Inicia sesión para continuar con el estudio.
-            </p>
+
             <button
               type="button"
-              className="mt-8 inline-flex h-11 items-center justify-center rounded-full bg-emerald-500 px-8 text-sm font-semibold text-[#0b1210] transition hover:bg-opacity-90"
-              onClick={() => navigate('/')}
+              onClick={() => setFormData({ ...formData, agree_terms: !formData.agree_terms })}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
+                background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+                fontFamily: 'inherit',
+              }}
             >
-              Ir al inicio de sesión
+              <span style={{ fontSize: 13, color: TM.amber, flexShrink: 0, marginTop: 1, fontWeight: 700 }}>
+                {formData.agree_terms ? '[x]' : '[ ]'}
+              </span>
+              <span style={{ fontSize: 12, color: TM.dim }}>
+                acepto los términos y condiciones del estudio
+              </span>
             </button>
           </div>
+
+          {recaptchaSiteKey ? (
+            <div style={{ marginTop: 14 }}>
+              <ReCAPTCHA ref={recaptchaRef} sitekey={recaptchaSiteKey} theme="dark" />
+            </div>
+          ) : (
+            <div style={{ marginTop: 14, fontSize: 11, color: TM.red }}>
+              <span style={{ color: TM.dim }}>warn →</span> falta configurar la clave reCAPTCHA en el entorno.
+            </div>
+          )}
+
+          {error && (
+            <div style={{ marginTop: 14, fontSize: 12, color: TM.red }}>
+              <span style={{ color: TM.dim }}>err →</span> {error}
+            </div>
+          )}
+
+          <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end' }}>
+            <TMBtn kind="amber" size="lg" type="submit" disabled={loading}>
+              {loading ? './creando…' : './crear --cuenta'}
+            </TMBtn>
+          </div>
+
+          <div style={{
+            marginTop: 28, paddingTop: 14, borderTop: `1px dashed ${TM.rule}`,
+            fontSize: 12, color: TM.dim, textAlign: 'center',
+          }}>
+            ¿ya tenés cuenta?{' '}
+            <span onClick={() => navigate('/')} style={{ color: TM.amber, cursor: 'pointer' }}>
+              ./login
+            </span>
+          </div>
+
+          <div style={{ marginTop: 12, fontSize: 10, color: TM.dim, textAlign: 'center' }}>
+            sitio protegido por reCAPTCHA ·{' '}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"
+              style={{ color: TM.cyan }}>privacidad</a>{' '}y{' '}
+            <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer"
+              style={{ color: TM.cyan }}>términos</a>{' '}de Google
+          </div>
+        </form>
+      </main>
+
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(16,14,12,0.85)', padding: '0 24px',
+        }}>
+          <TMBox title="CUENTA CREADA" accent={TM.green} style={{ width: 380, maxWidth: '100%' }}>
+            <div style={{ fontSize: 13, color: TM.fg, marginBottom: 8 }}>
+              <span style={{ color: TM.green }}>[x]</span> tus datos fueron guardados correctamente.
+            </div>
+            <div style={{ fontSize: 12, color: TM.dim, marginBottom: 20 }}>
+              // iniciá sesión para comenzar el estudio
+            </div>
+            <TMBtn kind="amber" onClick={() => navigate('/')}>
+              ./ir al login
+            </TMBtn>
+          </TMBox>
         </div>
       )}
-    </div>
+    </TMFrame>
   );
 };
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
+import { TM, TMFrame, TMField, TMBtn, TMPrompt } from '../components/terminal';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,80 +15,73 @@ const Login = () => {
     event.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
       const result = await login({ email, password });
-      if (result === 'pretest') {
-        navigate('/study/pretest', { replace: true });
-      } else if (result === 'dashboard') {
-        navigate('/dashboard', { replace: true });
-      } else {
-        setError('Correo o contraseña incorrectos.');
-      }
+      if (result === 'pretest') navigate('/study/pretest', { replace: true });
+      else if (result === 'dashboard') navigate('/dashboard', { replace: true });
+      else setError('correo o contraseña incorrectos.');
     } catch {
-      setError('No pudimos iniciar sesión. Verifica tus datos.');
+      setError('no pudimos iniciar sesión. verificá tus datos.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative flex size-full min-h-screen flex-col bg-[#0b1210] text-white">
-      <div className="flex items-center justify-between whitespace-nowrap border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold tracking-tight">AI Math App</span>
-        <button
-          className="rounded-full h-10 px-4 bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition"
-          onClick={() => navigate('/register')}
-        >
-          Crear cuenta
-        </button>
-      </div>
-
-      <main className="flex flex-1 justify-center py-10 px-6 md:px-0">
-        <div className="w-full max-w-xl bg-[#101a17] border border-[#1f2c26] rounded-3xl p-8 md:p-12 shadow-2xl">
-          <div className="text-center mb-10">
-            <p className="text-sm uppercase tracking-[0.3em] text-[#6aa58e]">Bienvenido</p>
-            <h2 className="text-3xl font-bold tracking-tight">Inicia sesión</h2>
-            <p className="text-sm text-[#9eb7a8] mt-3">
-              Ingresa con tu correo institucional para continuar con el plan de aprendizaje.
-            </p>
+    <TMFrame title="mathlab" subtitle="~/auth/login">
+      <main
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 32px)',
+          padding: 36,
+        }}
+      >
+        <form onSubmit={handleSubmit} style={{ width: 420, maxWidth: '100%' }}>
+          <TMPrompt color={TM.cyan}>./login</TMPrompt>
+          <h1 style={{ fontSize: 30, color: TM.fg, fontWeight: 700, margin: '14px 0 6px' }}>
+            <span style={{ color: TM.amber }}>&gt;</span> bienvenida de vuelta
+          </h1>
+          <div style={{ fontSize: 11, color: TM.dim, marginBottom: 22 }}>
+            // ingresá para retomar tu camino
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <label className="flex flex-col gap-2 text-sm font-medium text-[#d2e4da]">
-              Correo electrónico
-              <input
-                className="rounded-full border border-[#29382f] bg-[#0b1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-emerald-500 focus:ring-emerald-500 outline-none"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="ejemplo@correo.com"
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-[#d2e4da]">
-              Contraseña
-              <input
-                className="rounded-full border border-[#29382f] bg-[#0b1612] px-4 py-3 text-white placeholder:text-[#6aa58e] focus:border-emerald-500 focus:ring-emerald-500 outline-none"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full h-12 px-6 bg-emerald-500 text-black text-base font-bold tracking-[0.015em] hover:opacity-90 transition disabled:opacity-60"
-            >
-              {loading ? 'Iniciando sesión...' : 'Ingresar'}
-            </button>
-            {error && <p className="text-center text-sm text-red-400">{error}</p>}
-          </form>
-        </div>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <TMField label="email" placeholder="lucia@correo.com"
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <TMField label="passwd" placeholder="••••••••"
+              type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+
+          {error && (
+            <div style={{ marginTop: 14, fontSize: 12, color: TM.red }}>
+              <span style={{ color: TM.dim }}>err →</span> {error}
+            </div>
+          )}
+
+          <div style={{ marginTop: 18, display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+            <span
+              onClick={() => navigate('/forgot')}
+              style={{ fontSize: 11, color: TM.cyan, cursor: 'pointer' }}
+            >// olvidé mi clave</span>
+            <TMBtn kind="amber" size="lg" type="submit" disabled={loading}>
+              {loading ? './validando…' : './enter'}
+            </TMBtn>
+          </div>
+
+          <div style={{
+            marginTop: 32, paddingTop: 18, borderTop: `1px dashed ${TM.rule}`,
+            fontSize: 12, color: TM.dim, textAlign: 'center',
+          }}>
+            ¿primera vez?{' '}
+            <span onClick={() => navigate('/register')} style={{ color: TM.amber, cursor: 'pointer' }}>
+              ./register --new
+            </span>
+          </div>
+        </form>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 

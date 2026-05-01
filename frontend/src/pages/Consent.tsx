@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { submitConsent } from '../services/api.ts';
+import { TM, TMFrame, TMBox, TMBtn, TMPrompt } from '../components/terminal';
 
 const Consent = () => {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ const Consent = () => {
 
   const handleSubmit = async () => {
     if (!accepted) {
-      setError('Debes aceptar el consentimiento para continuar.');
+      setError('tenés que aceptar el consentimiento para continuar.');
       return;
     }
     setLoading(true);
@@ -21,52 +22,93 @@ const Consent = () => {
       await submitConsent({ documentVersion: 'v1', accepted: true });
       navigate('/study/pretest');
     } catch {
-      setError('Error al registrar el consentimiento.');
+      setError('no pudimos registrar el consentimiento. intentá de nuevo.');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0b1210] text-white">
-      <nav className="flex items-center justify-between border-b border-[#29382f] px-6 md:px-10 py-3">
-        <span className="text-lg font-bold">Consentimiento informado</span>
-        <button onClick={logout} className="text-sm text-red-400 hover:text-red-300">Salir</button>
-      </nav>
-      <main className="px-6 md:px-10 py-10 max-w-2xl mx-auto">
-        <div className="bg-[#101a17] border border-[#29382f] rounded-2xl p-6 md:p-8">
-          <h1 className="text-2xl font-bold mb-6">Consentimiento informado</h1>
-          <div className="space-y-4 text-[#d2e4da] text-sm leading-relaxed mb-8">
-            <p>Bienvenido/a a este estudio de investigación sobre el uso de inteligencia artificial en el aprendizaje de matemáticas.</p>
-            <p>Este estudio tiene como objetivo evaluar el impacto de un tutor inteligente en el rendimiento académico de estudiantes adultos en matemáticas básicas.</p>
-            <p>Tu participación es voluntaria. Puedes retirarte en cualquier momento sin penalización.</p>
-            <p>Los datos recopilados serán utilizados únicamente con fines de investigación académica y serán tratados de forma confidencial.</p>
-            <p>Si tienes alguna pregunta sobre el estudio, puedes contactar al investigador principal.</p>
+    <TMFrame title="mathlab" subtitle="~/auth/consent">
+      <main
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 32px)',
+          padding: '36px 20px',
+        }}
+      >
+        <div style={{ width: 540, maxWidth: '100%' }}>
+          <TMPrompt color={TM.cyan}>./consent --read</TMPrompt>
+          <h1 style={{ fontSize: 26, color: TM.fg, fontWeight: 700, margin: '14px 0 6px' }}>
+            <span style={{ color: TM.amber }}>&gt;</span> consentimiento informado
+          </h1>
+          <div style={{ fontSize: 11, color: TM.dim, marginBottom: 22 }}>
+            // leé con atención antes de continuar
           </div>
 
-          <label className="flex items-start gap-3 mb-6 cursor-pointer">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <TMBox title="QUÉ ESTAMOS ESTUDIANDO" accent={TM.amber}>
+              <p style={{ fontSize: 13, color: TM.fg, lineHeight: 1.6, margin: 0 }}>
+                este estudio evalúa el impacto de un tutor inteligente en el aprendizaje de
+                matemáticas básicas en adultos. queremos entender cómo la IA puede ayudarte
+                a mejorar tu rendimiento académico.
+              </p>
+            </TMBox>
+
+            <TMBox title="QUÉ RECOLECTAMOS" accent={TM.cyan}>
+              <div style={{ fontSize: 13, color: TM.fg, lineHeight: 1.7 }}>
+                <div><span style={{ color: TM.cyan }}>↳</span> respuestas a ejercicios y tests</div>
+                <div><span style={{ color: TM.cyan }}>↳</span> tiempos de sesión y patrones de uso</div>
+                <div><span style={{ color: TM.cyan }}>↳</span> interacciones con el tutor IA</div>
+                <div style={{ marginTop: 8, fontSize: 11, color: TM.dim }}>
+                  // todos los datos son confidenciales y de uso académico exclusivo
+                </div>
+              </div>
+            </TMBox>
+
+            <TMBox title="TUS DERECHOS" accent={TM.amber}>
+              <div style={{ fontSize: 13, color: TM.fg, lineHeight: 1.7 }}>
+                <div><span style={{ color: TM.amber }}>↳</span> participación 100% voluntaria</div>
+                <div><span style={{ color: TM.amber }}>↳</span> podés retirarte en cualquier momento sin penalización</div>
+                <div><span style={{ color: TM.amber }}>↳</span> podés solicitar la eliminación de tus datos</div>
+                <div style={{ marginTop: 8, fontSize: 11, color: TM.dim }}>
+                  // ante dudas, contactá al investigador principal
+                </div>
+              </div>
+            </TMBox>
+          </div>
+
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            cursor: 'pointer', margin: '22px 0 0',
+          }}>
             <input
               type="checkbox"
               checked={accepted}
               onChange={(e) => setAccepted(e.target.checked)}
-              className="mt-1 w-5 h-5 rounded border-[#29382f] bg-[#0b1612] text-emerald-500 focus:ring-emerald-500"
+              style={{ marginTop: 2, accentColor: TM.amber }}
             />
-            <span className="text-sm text-[#d2e4da]">
-              He leído y comprendido la información proporcionada. Acepto participar voluntariamente en este estudio.
+            <span style={{ fontSize: 13, color: TM.fg }}>
+              leí y entendí la información. acepto participar voluntariamente en este estudio.
             </span>
           </label>
 
-          {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+          {error && (
+            <div style={{ marginTop: 14, fontSize: 12, color: TM.red }}>
+              <span style={{ color: TM.dim }}>err →</span> {error}
+            </div>
+          )}
 
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full rounded-full h-12 bg-emerald-500 text-black font-bold hover:opacity-90 transition disabled:opacity-60"
-          >
-            {loading ? 'Procesando...' : 'Continuar al pretest'}
-          </button>
+          <div style={{ marginTop: 22, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <TMBtn kind="ghost" onClick={logout}>./salir</TMBtn>
+            <TMBtn kind="amber" size="lg" onClick={handleSubmit} disabled={loading}>
+              {loading ? './procesando…' : './continuar --pretest →'}
+            </TMBtn>
+          </div>
         </div>
       </main>
-    </div>
+    </TMFrame>
   );
 };
 
