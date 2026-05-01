@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.tsx';
+import { TM, FONT_MONO } from './components/terminal';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import Login from './pages/Login.tsx';
 import Register from './pages/Register.tsx';
@@ -30,10 +31,15 @@ const ProtectedRoute = ({ children, skipPretestCheck = false, requirePosttestUnl
 
   if (prerequisitesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando autenticación...</p>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', background: TM.bgDeep, fontFamily: FONT_MONO,
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: TM.amber, marginBottom: 8 }}>
+            $ cargando autenticación…
+            <span style={{ animation: 'tm-blink 1.1s steps(1) infinite', marginLeft: 4 }}>▌</span>
+          </div>
         </div>
       </div>
     );
@@ -57,7 +63,7 @@ const ProtectedRoute = ({ children, skipPretestCheck = false, requirePosttestUnl
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: TM.bgDeep }}>
       <ErrorBoundary>
         <Routes>
         <Route path="/" element={<Login />} />

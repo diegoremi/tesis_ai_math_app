@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { TM, FONT_MONO } from './terminal';
 
 interface Props {
   children: ReactNode;
@@ -26,17 +27,35 @@ class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-6">
-          <div className="max-w-md w-full bg-gray-900 rounded-3xl border border-gray-800 p-8 text-center shadow-2xl">
-            <h1 className="text-2xl font-bold mb-4">Algo salio mal</h1>
-            <p className="text-gray-400 mb-6">
-              Ocurrio un error inesperado. Por favor recarga la pagina o vuelve al inicio.
+        <div style={{
+          minHeight: '100vh', background: TM.bgDeep,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 24px', fontFamily: FONT_MONO,
+        }}>
+          <div style={{
+            maxWidth: 420, width: '100%',
+            background: TM.panel, border: `1px solid ${TM.rule}`,
+            borderLeft: `2px solid ${TM.red}`,
+            padding: 28,
+          }}>
+            <div style={{ fontSize: 12, color: TM.dim, marginBottom: 14 }}>$ ./app --crash</div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: TM.fg, marginBottom: 8 }}>
+              <span style={{ color: TM.red }}>err →</span> algo salió mal
+            </h1>
+            <p style={{ fontSize: 13, color: TM.dim, marginBottom: 22, lineHeight: 1.6 }}>
+              // ocurrió un error inesperado. recargá la página o volvé al inicio.
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="rounded-full px-6 py-2 bg-emerald-500 text-black font-bold hover:opacity-90 transition"
+              style={{
+                background: TM.amber, color: TM.bgDeep,
+                border: `1px solid ${TM.amber}`,
+                padding: '7px 16px', fontSize: 13,
+                fontFamily: FONT_MONO, cursor: 'pointer',
+                fontWeight: 700, borderRadius: 0,
+              }}
             >
-              Recargar pagina
+              ./recargar
             </button>
           </div>
         </div>

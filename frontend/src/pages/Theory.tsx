@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
-import { generateTheoryModule, recordTheoryProgress, submitTheoryCheckpoint } from '../services/api.ts';
+import { generateTheoryModule, recordTheoryProgress } from '../services/api.ts';
 import { TM, TMFrame, TMNav, TMBox, TMBtn, TMPrompt } from '../components/terminal';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -44,17 +44,6 @@ const Theory = () => {
       // silently fail
     }
   };
-
-  const handleCheckpoint = async (moduleId: number, answers: Array<{ id: string; answer: string }>) => {
-    try {
-      await submitTheoryCheckpoint({ moduleId, answers });
-      await refreshStudyStatus();
-    } catch {
-      setError('error al validar el checkpoint.');
-    }
-  };
-
-  void handleCheckpoint;
 
   const handleNav = (id: string) => {
     if (id === 'dash') navigate('/dashboard');

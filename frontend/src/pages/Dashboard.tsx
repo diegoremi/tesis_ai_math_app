@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
-import { getActivities, getAssessments } from '../services/api.ts';
+import { getAssessments } from '../services/api.ts';
 import { TM, TMFrame, TMNav, TMBox, TMPrompt } from '../components/terminal';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { logout, featureFlags, studyStatus, refreshStudyStatus } = useAuth();
-  const [, setActivities] = useState<Array<Record<string, unknown>>>([]);
   const [assessments, setAssessments] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,11 +14,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [activitiesResponse, assessmentsResponse] = await Promise.all([
-          getActivities(),
-          getAssessments(),
-        ]);
-        setActivities(activitiesResponse.data as Array<Record<string, unknown>>);
+        const assessmentsResponse = await getAssessments();
         setAssessments(assessmentsResponse.data as Array<Record<string, unknown>>);
         await refreshStudyStatus();
       } catch {

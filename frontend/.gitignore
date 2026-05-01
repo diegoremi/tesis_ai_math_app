@@ -30,3 +30,17 @@ dist-ssr
 
 # TypeScript
 *.tsbuildinfo
+
+# Testing
+coverage/
+
+# Package archives
+*.tgz
+
+# Tool caches
+.cache/
+.vercel/
+.turbo/
+
+# Environment (production)
+.env.production
