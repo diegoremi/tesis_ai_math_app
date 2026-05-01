@@ -1,0 +1,41 @@
+/* Terminal Tutor · variables CSS */
+/* importar desde frontend/src/index.css con: @import './terminal/theme.css'; */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+:root {
+  --tm-bg: #1a1714;
+  --tm-bg-deep: #100e0c;
+  --tm-panel: #211d19;
+  --tm-panel-2: #2a2520;
+  --tm-fg: #e8dfd2;
+  --tm-dim: #7d7066;
+  --tm-rule: #3a322b;
+  --tm-amber: #ffb454;
+  --tm-amber-soft: #cf8a3a;
+  --tm-cyan: #7dd3fc;
+  --tm-green: #9bd454;
+  --tm-red: #ef6f6c;
+
+  --tm-font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+
+@keyframes tm-blink {
+  50% { opacity: 0; }
+}
+
+/* base reset para que el shell mande */
+html, body, #root {
+  background: var(--tm-bg-deep);
+  color: var(--tm-fg);
+  font-family: var(--tm-font-mono);
+}
+
+/* todo recto, siempre */
+input, button, textarea, select, .card, .btn { border-radius: 0 !important; }
+
+/* scrollbars discretos */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--tm-rule); }
+*::-webkit-scrollbar-thumb:hover { background: var(--tm-panel-2); }
+*::-webkit-scrollbar-track { background: transparent; }
