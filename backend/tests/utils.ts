@@ -32,9 +32,9 @@ export const loginTestUser = async (email: string, password: string = 'TestPassw
 
 export const createAuthenticatedUser = async (overrides = {}) => {
   const registerResponse = await createTestUser(overrides);
-  const email = registerResponse.body.user?.email || overrides.email;
+  const email = (registerResponse.body.user as { email?: string })?.email || (overrides as { email?: string }).email;
   
-  const loginResponse = await loginTestUser(email);
+  const loginResponse = await loginTestUser(email || '');
   const token = loginResponse.body.token;
 
   return {

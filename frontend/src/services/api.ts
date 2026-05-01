@@ -123,3 +123,5 @@ export const fetchAncovaDataset = (params: Record<string, unknown> = {}) =>
 export const updateUserFeatureFlags = (userId: number, flags: Record<string, boolean>) =>
   apiClient.patch(`/admin/users/${userId}/feature-flags`, flags);
 export const fetchAdminReport = () => apiClient.get('/admin/export/report');
+export const getAnalytics = () => apiClient.get('/admin/analytics');
+export const getParticipantProgress = () => apiClient.get('/admin/analytics/participants');
