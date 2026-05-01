@@ -10,6 +10,9 @@
     "seed:synthetic": "tsx prisma/seed-synthetic.ts",
     "db:reset-users": "tsx prisma/reset-users.ts"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
