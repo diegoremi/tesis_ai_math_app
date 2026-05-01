@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
@@ -48,16 +48,21 @@ jobs:
 
       - name: Setup Prisma
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=public
+          DIRECT_URL: postgresql://test:test@localhost:5432/test?schema=public
 
       - name: Run migrations
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=public
+          DIRECT_URL: postgresql://test:test@localhost:5432/test?schema=public
 
       - name: Seed database
         run: npx prisma db seed
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=public
+          DIRECT_URL: postgresql://test:test@localhost:5432/test?schema=public
 
       - name: Run tests
         run: npm test
