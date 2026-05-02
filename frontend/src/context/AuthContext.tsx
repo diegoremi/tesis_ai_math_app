@@ -67,6 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     requiredModules: 0,
     requiredCheckpoints: 0,
     posttestUnlocked: false,
+    consented: false,
     loaded: false,
   });
 
@@ -88,6 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       requiredModules: 0,
       requiredCheckpoints: 0,
       posttestUnlocked: false,
+      consented: false,
       loaded: true,
     });
   }, []);

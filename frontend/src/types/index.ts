@@ -25,6 +25,7 @@ export interface StudyStatus {
   requiredModules: number;
   requiredCheckpoints: number;
   posttestUnlocked: boolean;
+  consented: boolean;
   loaded: boolean;
 }
 

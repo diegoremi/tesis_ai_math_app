@@ -49,7 +49,13 @@ const ProtectedRoute = ({ children, skipPretestCheck = false, requirePosttestUnl
     return <Navigate to="/" replace />;
   }
 
+  const onConsentPage = location.pathname.startsWith('/study/consent');
   const onPretestPage = location.pathname.startsWith('/study/pretest');
+  
+  if (!studyStatus.consented && !onConsentPage) {
+    return <Navigate to="/study/consent" replace />;
+  }
+  
   if (!skipPretestCheck && !assessmentStatus.pretestCompleted && !onPretestPage) {
     return <Navigate to="/study/pretest" replace />;
   }

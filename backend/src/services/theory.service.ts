@@ -860,12 +860,18 @@ export const getStudyStatus = async (userId: number) => {
 
   const posttestUnlocked = modulesCompleted >= MIN_MODULES_REQUIRED && checkpointsPassed >= MIN_CHECKPOINTS_REQUIRED;
 
+  const consent = await prisma.consent.findFirst({
+    where: { user_id: userId, accepted: true },
+    orderBy: { accepted_at: 'desc' },
+  });
+
   logTheory('study status computed', {
     userId,
     modulesGenerated: modules.length,
     modulesCompleted,
     checkpointsPassed,
     posttestUnlocked,
+    consented: Boolean(consent),
   });
 
   return {
@@ -877,6 +883,7 @@ export const getStudyStatus = async (userId: number) => {
     requiredCheckpoints: MIN_CHECKPOINTS_REQUIRED,
     posttestUnlocked,
     generatedModules: modules.length,
+    consented: Boolean(consent),
   };
 };
 
