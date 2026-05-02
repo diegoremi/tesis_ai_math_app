@@ -93,20 +93,81 @@ const Theory = () => {
     return null;
   };
 
-  const renderSection = (section: unknown, idx: number) => {
-    if (typeof section !== 'object' || section === null) return null;
-    const sec = section as Record<string, unknown>;
+  const renderSectionItem = (item: unknown, key: string | number) => {
+    if (typeof item === 'string') {
+      // Heuristic: short strings ending with ":" are headings
+      if (item.length < 60 && item.trim().endsWith(':')) {
+        return (
+          <h3 key={key} style={{ fontSize: 15, color: TM.amber, marginBottom: 10, marginTop: 20, fontWeight: 700 }}>
+            {item}
+          </h3>
+        );
+      }
+      return <p key={key} style={{ marginBottom: 10, lineHeight: 1.7 }}>{renderText(item)}</p>;
+    }
+    if (typeof item === 'object' && item !== null) {
+      const obj = item as Record<string, unknown>;
+      if (typeof obj.math === 'string') {
+        return (
+          <div key={key} style={{ margin: '12px 0' }}>
+            <BlockMath math={obj.math} />
+          </div>
+        );
+      }
+      if (typeof obj.callout === 'string') {
+        return (
+          <div
+            key={key}
+            style={{
+              margin: '12px 0',
+              padding: '10px 14px',
+              background: 'rgba(74,203,178,0.08)',
+              borderLeft: `2px solid ${TM.cyan}`,
+            }}
+          >
+            <span style={{ color: TM.cyan, fontSize: 12 }}>&gt; </span>
+            <span style={{ color: TM.fg, fontSize: 13 }}>{renderText(obj.callout)}</span>
+          </div>
+        );
+      }
+      if (obj.visualization) {
+        return (
+          <div key={key} style={{ margin: '12px 0', padding: 10, background: TM.panel, border: `1px solid ${TM.rule}` }}>
+            <span style={{ color: TM.dim, fontSize: 11 }}>// visualización disponible en el contenido</span>
+          </div>
+        );
+      }
+    }
+    return null;
+  };
+
+  const renderStructuredSection = (section: Record<string, unknown>, idx: number) => {
     return (
       <div key={idx} style={{ marginBottom: 24 }}>
-        {Boolean(sec.heading) && <h3 style={{ fontSize: 15, color: TM.amber, marginBottom: 10, fontWeight: 700 }}>{String(sec.heading)}</h3>}
-        {Array.isArray(sec.body) && sec.body.map((item, i) => renderBodyItem(item, i))}
-        {Boolean(sec.visualization) && (
+        {Boolean(section.heading) && (
+          <h3 style={{ fontSize: 15, color: TM.amber, marginBottom: 10, fontWeight: 700 }}>
+            {String(section.heading)}
+          </h3>
+        )}
+        {Array.isArray(section.body) && section.body.map((item, i) => renderBodyItem(item, i))}
+        {Boolean(section.visualization) && (
           <div style={{ margin: '12px 0', padding: 10, background: TM.panel, border: `1px solid ${TM.rule}` }}>
             <span style={{ color: TM.dim, fontSize: 11 }}>// visualización disponible en el contenido</span>
           </div>
         )}
       </div>
     );
+  };
+
+  const renderSections = (sections: unknown[]) => {
+    // Detect format: structured (fallback) vs flat (AI-generated)
+    const isFlat = sections.length > 0 && (typeof sections[0] === 'string' || (typeof sections[0] === 'object' && sections[0] !== null && !('heading' in (sections[0] as object))));
+    
+    if (isFlat) {
+      return <div>{sections.map((item, i) => renderSectionItem(item, i))}</div>;
+    }
+    
+    return <div>{sections.map((section, i) => renderStructuredSection(section as Record<string, unknown>, i))}</div>;
   };
 
   return (
@@ -170,7 +231,7 @@ const Theory = () => {
                 )}
                 <div style={{ fontSize: 14, color: TM.fg, lineHeight: 1.7 }}>
                   {content && Array.isArray(content.sections) ? (
-                    content.sections.map((section: unknown, idx: number) => renderSection(section, idx))
+                    renderSections(content.sections)
                   ) : (
                     <span style={{ color: TM.dim }}>sin contenido disponible.</span>
                   )}
