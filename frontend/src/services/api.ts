@@ -18,12 +18,8 @@ const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('[apiClient interceptor] Token from localStorage:', token ? 'present' : 'missing');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[apiClient interceptor] Added Authorization header for:', config.url);
-    } else {
-      console.log('[apiClient interceptor] No token for:', config.url);
     }
     return config;
   },
@@ -38,7 +34,7 @@ apiClient.interceptors.response.use(
       const status = error.response.status;
       const message = error.response.data?.error?.message || error.message;
 
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         localStorage.removeItem('token');
         window.location.href = '/';
         return Promise.reject(new Error('Session expired. Please log in again.'));

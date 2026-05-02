@@ -23,7 +23,6 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     headers: {
       'content-type': req.headers['content-type'],
       'user-agent': req.headers['user-agent'],
-      'authorization': req.headers['authorization'] ? 'Bearer [REDACTED]' : 'none',
     },
   });
   next();
