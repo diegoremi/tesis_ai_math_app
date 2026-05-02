@@ -72,7 +72,7 @@ describe('Authentication', () => {
         .get('/api/study/status')
         .set('Authorization', 'Bearer invalid_token');
       
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
     });
   });
 });
