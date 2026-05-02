@@ -98,9 +98,9 @@ const Theory = () => {
     const sec = section as Record<string, unknown>;
     return (
       <div key={idx} style={{ marginBottom: 24 }}>
-        {sec.heading && <h3 style={{ fontSize: 15, color: TM.amber, marginBottom: 10, fontWeight: 700 }}>{String(sec.heading)}</h3>}
+        {Boolean(sec.heading) && <h3 style={{ fontSize: 15, color: TM.amber, marginBottom: 10, fontWeight: 700 }}>{String(sec.heading)}</h3>}
         {Array.isArray(sec.body) && sec.body.map((item, i) => renderBodyItem(item, i))}
-        {sec.visualization && (
+        {Boolean(sec.visualization) && (
           <div style={{ margin: '12px 0', padding: 10, background: TM.panel, border: `1px solid ${TM.rule}` }}>
             <span style={{ color: TM.dim, fontSize: 11 }}>// visualización disponible en el contenido</span>
           </div>

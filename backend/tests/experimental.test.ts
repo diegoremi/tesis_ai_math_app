@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../src/app.js';
-import { createAuthenticatedUser, submitConsent, createPretest } from './utils.js';
+import { createAuthenticatedUser, createAuthenticatedUserWithoutConsent, submitConsent, createPretest } from './utils.js';
 import { prisma } from '../src/lib/prisma.js';
 
 describe('Experimental Flow', () => {
@@ -53,7 +53,7 @@ describe('Experimental Flow', () => {
 
   describe('Consent Enforcement', () => {
     it('should block evaluation creation without consent', async () => {
-      const { token } = await createAuthenticatedUser();
+      const { token } = await createAuthenticatedUserWithoutConsent();
       
       const response = await request(app)
         .post('/api/evaluations')

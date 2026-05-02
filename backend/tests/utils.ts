@@ -45,6 +45,15 @@ export const createAuthenticatedUser = async (overrides = {}) => {
   };
 };
 
+export const createAuthenticatedUserWithoutConsent = async (overrides = {}) => {
+  const result = await createAuthenticatedUser(overrides);
+  const userId = (result.user as { user_id?: number })?.user_id;
+  if (userId) {
+    await prisma.consent.deleteMany({ where: { user_id: userId } });
+  }
+  return result;
+};
+
 export const submitConsent = async (token: string) => {
   return request(app)
     .post('/api/study/consent')
