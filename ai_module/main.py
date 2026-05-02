@@ -7,15 +7,21 @@ from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-import google.generativeai as genai
+from openai import OpenAI
 from mangum import Mangum
 
 app = FastAPI()
 handler = Mangum(app)
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-if API_KEY:
-    genai.configure(api_key=API_KEY)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+
+client: Optional[OpenAI] = None
+if OPENROUTER_API_KEY:
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
 
 
 @app.get("/health")
@@ -46,8 +52,8 @@ class TheoryModuleRequest(BaseModel):
     moduleIndex: int = Field(0, ge=0)
 
 
-def has_gemini_key() -> bool:
-    return bool(API_KEY)
+def has_ai_key() -> bool:
+    return client is not None
 
 
 PII_PATTERNS = [
@@ -81,9 +87,27 @@ def read_root():
     return {"Hello": "World"}
 
 
+def _openrouter_chat(messages: List[Dict[str, str]], system: Optional[str] = None, temperature: float = 0.7, max_tokens: int = 2048) -> str:
+    if not client:
+        raise RuntimeError("OpenRouter client not configured")
+
+    api_messages: List[Dict[str, str]] = []
+    if system:
+        api_messages.append({"role": "system", "content": system})
+    api_messages.extend(messages)
+
+    response = client.chat.completions.create(
+        model=OPENROUTER_MODEL,
+        messages=api_messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return response.choices[0].message.content or ""
+
+
 @app.post("/chat")
 def chat(chat_message: ChatMessage):
-    if not has_gemini_key():
+    if not has_ai_key():
         return {"response": "I currently cannot reach the AI service, but keep practicing—consistency is key!"}
 
     redacted_message = redact(chat_message.message)
@@ -99,29 +123,31 @@ def chat(chat_message: ChatMessage):
         }
 
     try:
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-lite',
-            system_instruction=(
-                "Eres un tutor de matemáticas para adultos jóvenes (18+). "
-                "Tu rol es guiar el aprendizaje, NO dar respuestas directas a problemas. "
-                "REGLAS ESTRICTAS:\n"
-                "1. NUNCA respondas preguntas de evaluaciones, exámenes o tests.\n"
-                "2. NUNCA des la respuesta numérica final de un ejercicio.\n"
-                "3. SIEMPRE guía con preguntas reflexivas y sugerencias de estrategia.\n"
-                "4. Usa un tono claro, motivador y adulto.\n"
-                "5. Explica conceptos con ejemplos relacionados, no resolviendo el ejercicio exacto del estudiante.\n"
-                "6. Si el estudiante pide la respuesta, redirige: 'Vamos a descomponer el problema juntos. ¿Qué información tienes?'"
-            ),
+        system_prompt = (
+            "Eres un tutor de matemáticas para adultos jóvenes (18+). "
+            "Tu rol es guiar el aprendizaje, NO dar respuestas directas a problemas. "
+            "REGLAS ESTRICTAS:\n"
+            "1. NUNCA respondas preguntas de evaluaciones, exámenes o tests.\n"
+            "2. NUNCA des la respuesta numérica final de un ejercicio.\n"
+            "3. SIEMPRE guía con preguntas reflexivas y sugerencias de estrategia.\n"
+            "4. Usa un tono claro, motivador y adulto.\n"
+            "5. Explica conceptos con ejemplos relacionados, no resolviendo el ejercicio exacto del estudiante.\n"
+            "6. Si el estudiante pide la respuesta, redirige: 'Vamos a descomponer el problema juntos. ¿Qué información tienes?'"
         )
-        response = model.generate_content(redacted_message)
-        return {"response": response.text}
+        text = _openrouter_chat(
+            messages=[{"role": "user", "content": redacted_message}],
+            system=system_prompt,
+            temperature=0.7,
+            max_tokens=2048,
+        )
+        return {"response": text}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
 
 @app.post("/generate_exercise")
 def generate_exercise(exercise_prompt: ExercisePrompt):
-    if not has_gemini_key():
+    if not has_ai_key():
         return {
             "question": "What is 7 + 5?",
             "answer": "12",
@@ -129,15 +155,17 @@ def generate_exercise(exercise_prompt: ExercisePrompt):
 
     try:
         redacted_prompt = redact(exercise_prompt.prompt)
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-lite',
-            system_instruction=(
-                "You are a math problem generator. Generate a single math problem and its answer "
-                "based on the user's request. Provide JSON: {\"question\": ..., \"answer\": ...}."
-            ),
+        system_prompt = (
+            "You are a math problem generator. Generate a single math problem and its answer "
+            "based on the user's request. Provide JSON: {\"question\": ..., \"answer\": ...}."
         )
-        response = model.generate_content(redacted_prompt)
-        return json.loads(response.text)
+        text = _openrouter_chat(
+            messages=[{"role": "user", "content": redacted_prompt}],
+            system=system_prompt,
+            temperature=0.7,
+            max_tokens=1024,
+        )
+        return json.loads(text)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
@@ -147,7 +175,7 @@ def generate_hint(request: HintRequest):
     if not request.stem:
         raise HTTPException(status_code=400, detail="stem is required for hint generation")
 
-    if not has_gemini_key():
+    if not has_ai_key():
         return {"hint": _fallback_hint(request.hint_level)}
 
     option_text = ""
@@ -196,15 +224,17 @@ def generate_hint(request: HintRequest):
     )
 
     try:
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-lite',
-            system_instruction=(
-                "You deliver short, actionable math hints without giving the solution away. "
-                "You NEVER reveal the final answer. You guide the student to discover it themselves."
-            ),
+        system_prompt = (
+            "You deliver short, actionable math hints without giving the solution away. "
+            "You NEVER reveal the final answer. You guide the student to discover it themselves."
         )
-        response = model.generate_content(prompt)
-        return {"hint": response.text.strip() if response.text else _fallback_hint(request.hint_level)}
+        text = _openrouter_chat(
+            messages=[{"role": "user", "content": prompt}],
+            system=system_prompt,
+            temperature=0.7,
+            max_tokens=1024,
+        )
+        return {"hint": text.strip() if text else _fallback_hint(request.hint_level)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
@@ -224,19 +254,19 @@ def generate_theory_module(payload: TheoryModuleRequest):
     module_index = max(payload.moduleIndex, 0)
     profile = payload.participantProfile or {}
 
-    if not has_gemini_key():
+    if not has_ai_key():
         return _fallback_theory_module(payload)
 
     try:
         system_prompt = (
             "Eres un diseñador instruccional de matemática. Devuelves JSON válido con la forma:"
-            " {\"title\": str, \"description\": str, \"version\": str, \"sections\": [ ... ], \"checkpoint\": {...}}."
+            ' {"title": str, "description": str, "version": str, "sections": [ ... ], "checkpoint": {...}}.'
             " Cada sección puede incluir elementos: texto simple, objetos {\"math\": Latex}, {\"callout\": str},"
-            " o {\"visualization\": {\"type\": \"plotly\", \"data\": [...], \"layout\": {...}}}."
+            ' o {\"visualization\": {\"type\": \"plotly\", \"data\": [...], \"layout\": {...}}}.'
             " Ajusta el tono al nivel académico y edad del participante."
         )
 
-        request = {
+        request_content = {
             "profile": profile,
             "pretest": payload.pretestSummary,
             "reflection": redact(payload.reflection or "") if payload.reflection else None,
@@ -244,21 +274,37 @@ def generate_theory_module(payload: TheoryModuleRequest):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-        model = genai.GenerativeModel('gemini-2.0-flash-lite', system_instruction=system_prompt)
-        response = model.generate_content(
-            json.dumps(
-              {
-                "instruction": "Genera contenido pedagógico personalizado.",
-                "request": request,
-              }
-            )
+        prompt = (
+            "Genera contenido pedagógico personalizado en español para un módulo de matemáticas. "
+            "Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown.\n\n"
+            f"Solicitud: {json.dumps(request_content, ensure_ascii=False)}"
         )
-        if not response.text:
+
+        text = _openrouter_chat(
+            messages=[{"role": "user", "content": prompt}],
+            system=system_prompt,
+            temperature=0.7,
+            max_tokens=4096,
+        )
+
+        if not text:
             return _fallback_theory_module(payload)
+
+        # Try to extract JSON if the model wrapped it in markdown
+        cleaned = text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
         try:
-            parsed = json.loads(response.text)
+            parsed = json.loads(cleaned)
         except json.JSONDecodeError:
             return _fallback_theory_module(payload)
+
         parsed.setdefault("moduleId", f"generated-{module_index}")
         parsed.setdefault("version", "ai-v1")
         parsed.setdefault("title", f"Módulo {module_index + 1}")
