@@ -53,11 +53,11 @@ const Theory = () => {
     else if (id === 'profile') navigate('/profile');
   };
 
-  const content = activeModule?.content as string | undefined;
+  const content = activeModule?.content as Record<string, unknown> | undefined;
   const description = activeModule?.description as string | undefined;
   const glossary = activeModule?.glossary as Array<{ term: string; definition: string }> | undefined;
 
-  const renderContent = (text: string) => {
+  const renderText = (text: string) => {
     const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$]+?\$)/g);
     return parts.map((part, i) => {
       if (part.startsWith('$$') && part.endsWith('$$')) {
@@ -70,6 +70,43 @@ const Theory = () => {
       }
       return <span key={i}>{part}</span>;
     });
+  };
+
+  const renderBodyItem = (item: unknown, i: number) => {
+    if (typeof item === 'string') {
+      return <p key={i} style={{ marginBottom: 10 }}>{renderText(item)}</p>;
+    }
+    if (typeof item === 'object' && item !== null) {
+      const obj = item as Record<string, string>;
+      if (obj.math) {
+        return <div key={i} style={{ margin: '12px 0' }}><BlockMath math={obj.math} /></div>;
+      }
+      if (obj.callout) {
+        return (
+          <div key={i} style={{ margin: '12px 0', padding: '10px 14px', background: 'rgba(74,203,178,0.08)', borderLeft: `2px solid ${TM.cyan}` }}>
+            <span style={{ color: TM.cyan, fontSize: 12 }}>&gt; </span>
+            <span style={{ color: TM.fg, fontSize: 13 }}>{renderText(obj.callout)}</span>
+          </div>
+        );
+      }
+    }
+    return null;
+  };
+
+  const renderSection = (section: unknown, idx: number) => {
+    if (typeof section !== 'object' || section === null) return null;
+    const sec = section as Record<string, unknown>;
+    return (
+      <div key={idx} style={{ marginBottom: 24 }}>
+        {sec.heading && <h3 style={{ fontSize: 15, color: TM.amber, marginBottom: 10, fontWeight: 700 }}>{String(sec.heading)}</h3>}
+        {Array.isArray(sec.body) && sec.body.map((item, i) => renderBodyItem(item, i))}
+        {sec.visualization && (
+          <div style={{ margin: '12px 0', padding: 10, background: TM.panel, border: `1px solid ${TM.rule}` }}>
+            <span style={{ color: TM.dim, fontSize: 11 }}>// visualización disponible en el contenido</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -132,7 +169,9 @@ const Theory = () => {
                   <p style={{ fontSize: 12, color: TM.dim, marginBottom: 14 }}>// {description}</p>
                 )}
                 <div style={{ fontSize: 14, color: TM.fg, lineHeight: 1.7 }}>
-                  {content ? renderContent(content) : (
+                  {content && Array.isArray(content.sections) ? (
+                    content.sections.map((section: unknown, idx: number) => renderSection(section, idx))
+                  ) : (
                     <span style={{ color: TM.dim }}>sin contenido disponible.</span>
                   )}
                 </div>
