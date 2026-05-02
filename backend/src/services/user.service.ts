@@ -47,6 +47,19 @@ export const createUserService = async (userData: any) => {
     console.error('autoAssignParticipant failed', error);
   }
 
+  // Auto-record consent since user accepted terms during registration
+  try {
+    await prisma.consent.create({
+      data: {
+        user_id: newUser.user_id,
+        document_version: 'v1',
+        accepted: true,
+      },
+    });
+  } catch (error) {
+    console.error('Auto-consent recording failed', error);
+  }
+
   return newUser;
 };
 
